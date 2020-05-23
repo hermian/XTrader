@@ -69,6 +69,8 @@ portfolio_sheet = '포트폴리오'
 # 스프레드시트 매수 매도 색상 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
 
+
+
 # Telegram Setting *****************************************
 with open('secret/telegram_token.txt', mode='r') as tokenfile:
     TELEGRAM_TOKEN = tokenfile.readline().strip()
@@ -118,6 +120,8 @@ def periodcal(base_date): # 2018-06-23
 
 로봇스크린번호시작 = 9000
 로봇스크린번호종료 = 9999
+
+Stocklist = dict() # 구글스프레드시트 import 종목 저장 딕셔너리
 
 class PandasModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None, parent=None):
@@ -2133,7 +2137,12 @@ class 화면_TradeSuperValue(QDialog, Ui_TradeSuperValue):
         row_data = data_sheet.get_all_values()
         row_data[0].insert(2, '종목코드') # row_data[0] : columns
         for row in row_data[1:]:
-            row.insert(2, self.get_code(row[1])) # 종목명으로 종목코드 받아서(get_code 함수) 추가
+            try:
+                code = self.get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
+            except Exception as e:
+                code = ''
+                Telegram('종목명 입력 오류 : %s' % row[1])
+            row.insert(2, code)
 
         global Stocklist
         Stocklist = dict()
@@ -2141,22 +2150,23 @@ class 화면_TradeSuperValue(QDialog, Ui_TradeSuperValue):
         Stocklist['컬럼명'] = row_data[0]
 
         for idx in range(1, len(row_data)):
-            종목코드 = str(row_data[idx][2])
-            Stocklist[종목코드] = {'번호' : int(row_data[idx][0]),
-                               '종목명': row_data[idx][1],
-                               '종목코드': row_data[idx][2],
-                               '매수전략': list(map(int, row_data[idx][3].split('-'))),
-                               '매도전략': list(map(int, row_data[idx][3].split('-'))),
-                               '보유전략': row_data[idx][5],
-                               '매수가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                           '매수가' in col and row_data[idx][row_data[0].index(col)] != ''),
-                               '매도가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                           '매도가' in col and row_data[idx][row_data[0].index(col)] != '')
-                               }
+            if row_data[idx][2] != '':
+                종목코드 = str(row_data[idx][2])
+                Stocklist[종목코드] = {'번호' : int(row_data[idx][0]),
+                                   '종목명': row_data[idx][1],
+                                   '종목코드': row_data[idx][2],
+                                   '매수전략': list(map(int, row_data[idx][3].split('-'))),
+                                   '매도전략': list(map(int, row_data[idx][3].split('-'))),
+                                   '보유전략': row_data[idx][5],
+                                   '매수가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
+                                               '매수가' in col and row_data[idx][row_data[0].index(col)] != ''),
+                                   '매도가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
+                                               '매도가' in col and row_data[idx][row_data[0].index(col)] != '')
+                                   }
         # print(Stocklist)
 
         self.data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
-        self.data = self.data[self.data['모니터링여부']=='1']
+        self.data = self.data[(self.data['모니터링여부']=='1') & (self.data['종목코드']!='')]
 
         del self.data['번호']
         self.model.update(self.data)
@@ -3098,6 +3108,53 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pool[종목코드] = [시장구분, 종목명, 주식수, 시가총액]
         return pool
 
+    # 종목명으로 종목코드 읽음
+    def get_code(self, 종목명):
+        query = """
+                    select 종목코드
+                    from 종목코드
+                    where (종목명 = '%s')
+                """ %(종목명)
+        conn = sqliteconn()
+        df = pd.read_sql(query, con=conn)
+        conn.close()
+
+        # return df['종목코드'] # DataFrame Type 사용 시 리턴
+        return list(df['종목코드'].values)[0] # List Type 사용 시 리턴
+
+    # 구글스프레드시트 종목 Import
+    def import_googledata(self):
+        row_data = data_sheet.get_all_values()
+        row_data[0].insert(2, '종목코드')  # row_data[0] : columns
+        for row in row_data[1:]:
+            try:
+                code = self.get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
+            except Exception as e:
+                code = ''
+                Telegram('종목명 입력 오류 : %s' % row[1])
+            row.insert(2, code)
+
+        global Stocklist
+        Stocklist = dict()
+
+        Stocklist['컬럼명'] = row_data[0]
+
+        for idx in range(1, len(row_data)):
+            if row_data[idx][2] != '':
+                종목코드 = str(row_data[idx][2])
+                Stocklist[종목코드] = {'번호': int(row_data[idx][0]),
+                                   '종목명': row_data[idx][1],
+                                   '종목코드': row_data[idx][2],
+                                   '매수전략': list(map(int, row_data[idx][3].split('-'))),
+                                   '매도전략': list(map(int, row_data[idx][3].split('-'))),
+                                   '보유전략': row_data[idx][5],
+                                   '매수가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
+                                               '매수가' in col and row_data[idx][row_data[0].index(col)] != ''),
+                                   '매도가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
+                                               '매도가' in col and row_data[idx][row_data[0].index(col)] != '')
+                                   }
+        print(Stocklist)
+
     """
     # 조건 검색식 읽어서 해당 종목 저장
     def GetCondition(self):
@@ -3258,6 +3315,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.금일백업작업중 = True
         #     self.Backup(작업=None)
             pass
+
+        # 구글스프레드시트 종목 Import
+        if current_time == '17:30:00':
+            print('구글시트 Import')
+            self.import_googledata()
 
         # 로봇을 저장
         # if self.시작시각.strftime('%H:%M:%S') > '08:00:00' and self.시작시각.strftime('%H:%M:%S') < '15:30:00' and current.strftime('%H:%M:%S') > '01:00:00':
