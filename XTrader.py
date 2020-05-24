@@ -3,6 +3,7 @@
 import sys, os
 import datetime, time
 from math import ceil, floor # ceil : 소수점 이하를 올림, floor : 소수점 이하를 버림
+import math
 
 import pickle
 import uuid
@@ -60,11 +61,10 @@ spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLBu
 
 # spreadsheet 연결 및 worksheet setting
 doc = gc.open_by_url(spreadsheet_url)
-data_sheet = doc.worksheet('test')
+data_sheet = doc.worksheet('test') # Test Sheet
+# data_sheet = doc.worksheet('종목선정') # Sheet
 spreadsheet_key = '1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k' # Test Sheet
 # spreadsheet_key = '1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4' # Sheet
-
-portfolio_sheet = '포트폴리오'
 
 # 스프레드시트 매수 매도 색상 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
@@ -121,7 +121,7 @@ def periodcal(base_date): # 2018-06-23
 로봇스크린번호시작 = 9000
 로봇스크린번호종료 = 9999
 
-Stocklist = dict() # 구글스프레드시트 import 종목 저장 딕셔너리
+RobotEdit = False
 
 class PandasModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None, parent=None):
@@ -168,7 +168,7 @@ class PandasModel(QtCore.QAbstractTableModel):
 
 ## 포트폴리오에 사용되는 주식정보 클래스
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 매도가1차, 매도가2차, 손절가, 수량, 매수단위수=1, STATUS=''):
+    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 매도가1차=0, 매도가2차=0, 손절가=0, 수량=0, 매수단위수=1, STATUS=''):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
@@ -2133,46 +2133,37 @@ class 화면_TradeSuperValue(QDialog, Ui_TradeSuperValue):
         # self.data = self.data[['종목명','종목코드','매수가', '목표가']]
 
         # Google spreadcheet 사용_2 : List(스프레드 시트의 매수가 전략의 변동성 고려)
+        try:
+            row_data = data_sheet.get_all_values()
+            row_data[0].insert(0, '번호') # row_data[0] : columns, 구글 시트 업데이트를 위해 종목별 행번호 추가
+            row_data[0].insert(2, '종목코드')
 
-        row_data = data_sheet.get_all_values()
-        row_data[0].insert(2, '종목코드') # row_data[0] : columns
-        for row in row_data[1:]:
-            try:
-                code = self.get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
-            except Exception as e:
-                code = ''
-                Telegram('종목명 입력 오류 : %s' % row[1])
-            row.insert(2, code)
+            idx_count = 2
+            for row in row_data[1:]:
+                row.insert(0, idx_count)
+                try:
+                    code = self.get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
+                except Exception as e:
+                    code = ''
+                    Telegram('종목명 입력 오류 : %s' % row[1])
+                row.insert(2, code)
+                idx_count += 1
 
-        global Stocklist
-        Stocklist = dict()
+            self.data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
+            if '_' in self.lineEdit_name.text():
+                strategy = self.lineEdit_name.text().split('_')[0]
+                self.data = self.data[(self.data['매수모니터링'] == '1') & (self.data['종목코드'] != '')  & (self.data['매수전략'] == strategy)]
+            else:
+                self.data = self.data[(self.data['매수모니터링'] == '1') & (self.data['종목코드'] != '')]
 
-        Stocklist['컬럼명'] = row_data[0]
+            del self.data['매수모니터링']
 
-        for idx in range(1, len(row_data)):
-            if row_data[idx][2] != '':
-                종목코드 = str(row_data[idx][2])
-                Stocklist[종목코드] = {'번호' : int(row_data[idx][0]),
-                                   '종목명': row_data[idx][1],
-                                   '종목코드': row_data[idx][2],
-                                   '매수전략': list(map(int, row_data[idx][3].split('-'))),
-                                   '매도전략': list(map(int, row_data[idx][3].split('-'))),
-                                   '보유전략': row_data[idx][5],
-                                   '매수가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                               '매수가' in col and row_data[idx][row_data[0].index(col)] != ''),
-                                   '매도가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                               '매도가' in col and row_data[idx][row_data[0].index(col)] != '')
-                                   }
-        # print(Stocklist)
+            self.model.update(self.data)
 
-        self.data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
-        self.data = self.data[(self.data['모니터링여부']=='1') & (self.data['종목코드']!='')]
-
-        del self.data['번호']
-        self.model.update(self.data)
-
-        for i in range(len(self.data)):
-            self.tableView.resizeColumnToContents(i)
+            for i in range(len(self.data)):
+                self.tableView.resizeColumnToContents(i)
+        except Exception as e:
+            print(e)
 
 class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
     def __init__(self, sName, UUID, kiwoom=None, parent=None):
@@ -2234,18 +2225,35 @@ class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
                                 }})
 
     # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
-    def Setting(self, sScreenNo, 단위투자금=50 * 10000, 매수방법='00', 목표율=5, 손절율=3, 최대보유일=3, 매도방법='00', 종목리스트=pd.DataFrame()):
+    # def Setting(self, sScreenNo, 단위투자금=50 * 10000, 매수방법='00', 목표율=5, 손절율=3, 최대보유일=3, 매도방법='00', 종목리스트=pd.DataFrame()):
+    def Setting(self, sScreenNo, 단위투자금=50 * 10000, 매수방법='00',매도방법='00', 종목리스트=pd.DataFrame()):
         self.sScreenNo = sScreenNo
         self.실시간종목리스트 = []
         self.매수방법 = 매수방법
-        self.목표율 = 목표율
-        self.손절율 = 손절율
-        self.최대보유일 = 최대보유일
         self.매도방법 = 매도방법
         self.종목리스트 = 종목리스트
         self.단위투자금 = 단위투자금
-        self.단위투자비율 = 10
+        # self.단위투자비율 = 10
+
         # print(self.종목리스트)
+
+        self.Stocklist = dict()
+        self.Stocklist['컬럼명'] = list(self.종목리스트.columns)
+        for 종목코드 in self.종목리스트['종목코드'].unique():
+            temp_list = self.종목리스트[self.종목리스트['종목코드'] == 종목코드].values[0]
+            self.Stocklist[종목코드] = {
+                '번호': int(temp_list[0]),
+                '종목명': temp_list[1],
+                '종목코드': 종목코드,
+                '매수전략': temp_list[3],
+                '매도전략': temp_list[4],
+                '보유전략': temp_list[5],
+                '매수가': list(int(temp_list[list(self.종목리스트.columns).index(col)]) for col in self.종목리스트.columns if
+                            '매수가' in col and temp_list[list(self.종목리스트.columns).index(col)] != ''),
+                '매도가': list(int(temp_list[list(self.종목리스트.columns).index(col)]) for col in self.종목리스트.columns if
+                            '매도가' in col and temp_list[list(self.종목리스트.columns).index(col)] != '')
+            }
+        print(self.Stocklist)
 
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
     def 초기조건(self, codes):
@@ -2266,6 +2274,11 @@ class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
 
         for stock in df_keeplist['종목번호'].values: # 보유 종목 체크
             self.매도할종목.append(stock)
+            종목명 = df_keeplist[df_keeplist['종목번호']==stock]['종목명'].values[0]
+            매입가 = df_keeplist[df_keeplist['종목번호']==stock]['매입가'].values[0]
+            보유수량 = df_keeplist[df_keeplist['종목번호']==stock]['보유수량'].values[0]
+            print('종목코드 : %s, 종목명 : %s, 매입가 : %s, 보유수량 : %s' %(stock, 종목명, 매입가, 보유수량))
+            self.portfolio[stock] = CPortStock(종목코드=stock, 종목명=종목명, 매수가=매입가, 수량=보유수량, 매수일='')
 
     def 실시간데이타처리(self, param):
         try:
@@ -2457,7 +2470,7 @@ class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
             try:
                 Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
 
-                self.단위투자금 = floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점 버림
+                # self.단위투자금 = floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점 버림
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('단위투자금 : ', self.단위투자금)
 
@@ -3094,7 +3107,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def get_code_pool(self):
         print("MainWindow : get_code_pool")
         query = """
-            select 시장구분, 종목코드, 종목명, 주식수, 전일종가*주식수 as 시가총액
+            select 시장구분, 종목코드, 종목명, 주식수, 전일종가, 전일종가*주식수 as 시가총액
             from 종목코드
             order by 시장구분, 종목코드
         """
@@ -3104,8 +3117,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         pool = dict()
         for idx, row in df.iterrows():
-            시장구분, 종목코드, 종목명, 주식수, 시가총액 = row
-            pool[종목코드] = [시장구분, 종목명, 주식수, 시가총액]
+            시장구분, 종목코드, 종목명, 주식수, 전일종가, 시가총액 = row
+            pool[종목코드] = [시장구분, 종목명, 주식수, 전일종가, 시가총액]
         return pool
 
     # 종목명으로 종목코드 읽음
@@ -3123,37 +3136,45 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return list(df['종목코드'].values)[0] # List Type 사용 시 리턴
 
     # 구글스프레드시트 종목 Import
-    def import_googledata(self):
+    def import_googledata(self, check):
         row_data = data_sheet.get_all_values()
-        row_data[0].insert(2, '종목코드')  # row_data[0] : columns
+        row_data[0].insert(0, '번호')  # row_data[0] : columns, 구글 시트 업데이트를 위해 종목별 행번호 추가
+        row_data[0].insert(2, '종목코드')
+
+        idx_count = 2
         for row in row_data[1:]:
+            row.insert(0, idx_count)
             try:
                 code = self.get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
             except Exception as e:
                 code = ''
                 Telegram('종목명 입력 오류 : %s' % row[1])
             row.insert(2, code)
+            idx_count += 1
+        print('구글 시트 확인 완료')
 
-        global Stocklist
-        Stocklist = dict()
+        if check == False:
+            data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
+            print(data)
 
-        Stocklist['컬럼명'] = row_data[0]
+            # 매수 전략이 뭐 있는지 확인
+            strategy_list = list(data['매수전략'].unique())
 
-        for idx in range(1, len(row_data)):
-            if row_data[idx][2] != '':
-                종목코드 = str(row_data[idx][2])
-                Stocklist[종목코드] = {'번호': int(row_data[idx][0]),
-                                   '종목명': row_data[idx][1],
-                                   '종목코드': row_data[idx][2],
-                                   '매수전략': list(map(int, row_data[idx][3].split('-'))),
-                                   '매도전략': list(map(int, row_data[idx][3].split('-'))),
-                                   '보유전략': row_data[idx][5],
-                                   '매수가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                               '매수가' in col and row_data[idx][row_data[0].index(col)] != ''),
-                                   '매도가': list(int(row_data[idx][row_data[0].index(col)]) for col in row_data[0] if
-                                               '매도가' in col and row_data[idx][row_data[0].index(col)] != '')
-                                   }
-        print(Stocklist)
+            robot_list = []
+            for robot in self.robots:
+                robot_list.append(robot.sName.split('_')[0])
+
+            for strategy in strategy_list:
+                df_stock = data[(data['매수모니터링'] == '1') & (data['종목코드'] != '') & (data['매수전략'] == strategy)]
+                del df_stock['매수모니터링']
+                if strategy in robot_list:
+                    print('로봇 편집')
+                else:
+                    print('로봇 추가')
+                    print(df_stock)
+                    print(strategy)
+                    self.RobotAutoAdd_TradeSuperValue(df_stock, strategy)
+                    self.RobotView()
 
     """
     # 조건 검색식 읽어서 해당 종목 저장
@@ -3275,7 +3296,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     r.d = today
 
                     r.running = False
-                    print(r.portfolio)
                     # logger.debug(r.sName, r.UUID, len(r.portfolio))
                     self.robots.append(r)
 
@@ -3288,6 +3308,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def OnClockTick(self):
 
         current = datetime.datetime.now()
+        global current_time
         current_time = current.strftime('%H:%M:%S')
         savetime_list = ['08:50:00']  # 지정된 시간에 종목 저장하기 위함
         """savetime_list = ['09:00:00', '09:05:00', '09:10:00', '09:30:00', '10:00:00', '11:00:00', '12:00:00',
@@ -3316,10 +3337,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.Backup(작업=None)
             pass
 
-        # 구글스프레드시트 종목 Import
-        if current_time == '17:30:00':
-            print('구글시트 Import')
-            self.import_googledata()
+
+        # 종목 데이블 생성
+        if current_time == '19:16:00':
+            print('종목테이블 생성')
+            self.StockCodeBuild(to_db=True)
+
+        # 8시 30분에 구글 시트 오류 체크 시작
+        if current_time == '08:30:00':
+            self.checkclock = QTimer(self)
+            self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
+            self.checkclock.start(300000)  # 300000초마다 타이머 작동
+
+        # 8시 59분 : 구글스프레드시트 종목 Import
+        if current_time == '18:12:00':
+            # print('구글시트 Import')
+            # self.import_googledata(check=False)
+
+            print('구글시트 Check')
+            self.import_googledata(check=True)
 
         # 로봇을 저장
         # if self.시작시각.strftime('%H:%M:%S') > '08:00:00' and self.시작시각.strftime('%H:%M:%S') < '15:30:00' and current.strftime('%H:%M:%S') > '01:00:00':
@@ -3359,6 +3395,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.조회제한 = 0
         #logger.info("초당제한 주문 클리어")
 
+    # 프로그램 실행 후 5분 마다 실행 : 구글 스프레드 시트 오류 확인
+    def OnGoogleCheck(self):
+        if current_time == '08:58:00':
+            print('OnGoogleCheck 중지')
+            self.checkclock.stop()
+        else:
+            print('OnGoogleCheck')
+            self.import_googledata(check=True)
 
     # 메인 윈도우에서의 모든 액션에 대한 처리
     def MENU_Action(self, qaction):
@@ -3593,7 +3637,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ACC_NO = self.kiwoom.dynamicCall('GetLoginInfo("ACCNO")')
         self.account = ACC_NO.split(';')[0:-1]
         self.sAccount = self.account[0]
-
+        print('계좌 : ', self.sAccount)
         self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "계좌번호", self.sAccount)
         self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "d+2예수금요청", "opw00001", 0,
                                 '{:04d}'.format(self.ScreenNumber))
@@ -4565,13 +4609,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             robot.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 시총상한=시총상한, 시총하한=시총하한, 포트폴리오수=포트폴리오수, 매수방법=매수방법, 매도방법=매도방법)
 
     def RobotAdd_TradeSuperValue(self):
-        print("MainWindow : RobotAdd_TradeSuperValue1")
+        print("MainWindow : RobotAdd_TradeSuperValue")
         try:
             스크린번호 = self.GetUnAssignedScreenNumber()
             R = 화면_TradeSuperValue(parent=self)
             R.lineEdit_screen_number.setText('{:04d}'.format(스크린번호))
             if R.exec_():
-                이름 = R.lineEdit_name.text()
+                # 이름 = R.lineEdit_name.text()
                 # 스크린번호 = int(R.lineEdit_screen_number.text())
                 단위투자금 = int(R.lineEdit_unit.text()) * 10000
                 매수방법 = R.comboBox_buy_condition.currentText().strip()[0:2]
@@ -4579,19 +4623,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 손절율 = float(R.lineEdit_sellrate.text().strip())
                 최대보유일 = int(R.lineEdit_holdday.text().strip())
                 매도방법 = R.comboBox_sell_condition.currentText().strip()[0:2]
-
+                print(매수방법, 매도방법)
                 strategy_list = list(R.data['매수전략'].unique())
                 for strategy in strategy_list:
                     스크린번호 = self.GetUnAssignedScreenNumber()
-                    이름 = strategy+'_'+ 이름
+                    이름 = strategy+'_'+ R.lineEdit_name.text()
                     종목리스트 = R.data[R.data['매수전략'] == strategy]
-                    print(종목리스트)
+                    # print(종목리스트)
                     r = CTradeSuperValue(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
                     r.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 매수방법=매수방법, 목표율=목표율, 손절율=손절율, 최대보유일=최대보유일, 매도방법=매도방법, 종목리스트=종목리스트)
                     self.robots.append(r)
 
         except Exception as e:
             print('RobotAdd_TradeSuperValue', e)
+
+    def RobotAutoAdd_TradeSuperValue(self, data, strategy):
+        print("MainWindow : RobotAutoAdd_TradeSuperValue")
+        try:
+            스크린번호 = self.GetUnAssignedScreenNumber()
+            이름 = strategy + '_TradeSuperValue'
+            단위투자금 = 50 * 10000
+            매수방법 = '00'
+            매도방법 = '00'
+            종목리스트 = data
+            print('종목리스트')
+            print(종목리스트)
+            r = CTradeSuperValue(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
+            r.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
+            self.robots.append(r)
+
+        except Exception as e:
+            print('RobotAutoAdd_TradeSuperValue', e)
 
     def RobotEdit_TradeSuperValue(self, robot):
         R = 화면_TradeSuperValue(parent=self)
@@ -4699,12 +4761,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 df_code['상장일'] = df_code['상장일'].apply(lambda x: (x.to_pydatetime()).strftime('%Y-%m-%d %H:%M:%S'))
                 # print(df_code.values.tolist())
                 conn = sqliteconn()
-
                 df_code.to_sql('종목코드', conn, if_exists='replace', index=False)
-
                 conn.close()
 
             return df_code
+
         except Exception as e:
             print('StockCodeBuild', e)
 
