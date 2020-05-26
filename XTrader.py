@@ -71,16 +71,19 @@ credentials = ServiceAccountCredentials.from_json_keyfile_name(json_file_name, s
 gc = gspread.authorize(credentials)
 
 # XTrader-Stocklist URL
-spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k/edit#gid=0' # Test Sheet
-# spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4/edit#gid=0' # Sheeet
+# spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k/edit#gid=0' # Test Sheet
+spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4/edit#gid=0' # Sheeet
 
 # spreadsheet 연결 및 worksheet setting
 doc = gc.open_by_url(spreadsheet_url)
-stock_sheet = doc.worksheet('test') # Test Sheet
-# stock_sheet = doc.worksheet('종목선정') # Sheet
-strategy_sheet = doc.worksheet('ST_bot')
-spreadsheet_key = '1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k' # Test Sheet
-# spreadsheet_key = '1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4' # Sheet
+
+# stock_sheet = doc.worksheet('test') # Test Sheet
+stock_sheet = doc.worksheet('종목선정') # Sheet
+
+strategy_sheet = doc.worksheet('ST bot')
+
+# spreadsheet_key = '1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k' # Test Sheet
+spreadsheet_key = '1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4' # Sheet
 
 # 스프레드시트 매수 매도 색상 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
@@ -99,14 +102,13 @@ def import_googlesheet():
             code = get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
         except Exception as e:
             code = ''
-            Telegram('종목명 입력 오류 : %s' % row[1])
+            Telegram('[XTrader]종목명 입력 오류 : %s' % row[1])
         row.insert(2, code)
         # idx_count += 1              # 구글 시트에 번호 컬럼이 있으면 불필요
+        Telegram('[XTrader]구글 시트 확인 완료')
 
     data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
     return data
-
-
 
 
 # Telegram Setting *****************************************
@@ -159,8 +161,6 @@ def periodcal(base_date): # 2018-06-23
 
 로봇스크린번호시작 = 9000
 로봇스크린번호종료 = 9999
-
-
 
 
 class PandasModel(QtCore.QAbstractTableModel):
@@ -2352,6 +2352,7 @@ class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
             elif '구간' in data[0]:
                 self.Stocklist['전략']['구간별매도조건'].append(float(data[1][:-1]))
         self.Stocklist['전략']['구간별매도조건'].insert(1, 0.3)
+        self.단위투자금 = self.Stocklist['전략']['단위투자금']
 
         print(self.Stocklist)
 
@@ -2570,7 +2571,7 @@ class CTradeSuperValue(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
             try:
                 Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
 
-                # self.단위투자금 = floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점 버림
+                self.단위투자금 = self.Stocklist['전략']['단위투자금'] #floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점 버림
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('단위투자금 : ', self.단위투자금)
                 print('로봇 수 : ', len(self.parent.robots))
@@ -3215,7 +3216,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return pool
 
     # 구글스프레드시트 종목 Import
-    def updatedata(self, check):
+    def update_googledata(self, check):
         data = import_googlesheet()
 
         if check == False:
@@ -3403,28 +3404,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.Backup(작업=None)
             pass
 
-        # 종목 데이블 생성
+        # 8시 32분 : 종목 데이블 생성
         if current_time == '08:32:00':
             Telegram('[XTrader]종목테이블 생성')
             self.StockCodeBuild(to_db=True)
             self.CODE_POOL = self.get_code_pool()  # DB 종목데이블에서 시장구분, 코드, 종목명, 주식수, 전일종가 읽어옴
 
-        # 8시 35분에 구글 시트 오류 체크 시작
+        # 8시 35분 : 구글 시트 오류 체크 시작
         if current_time == '08:35:00':
             Telegram('[XTrader]구글 시트 오류 체크 시작')
             self.checkclock = QTimer(self)
             self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
             self.checkclock.start(300000)  # 300000초마다 타이머 작동
 
-        # 8시 59분 : 구글스프레드시트 종목 Import
+        # 8시 59분 : 구글 시트 종목 Import
         if current_time == '08:59:00':
             Telegram('[XTrader]구글 시트 오류 체크 중지')
             self.checkclock.stop()
 
             Telegram('[XTrader]구글시트 Import')
-            self.updatedata(check=False)
+            self.update_googledata(check=False)
 
-        # 8시 59분 30초 로봇 실행
+        # 8시 59분 30초 : 로봇 실행
         if '08:59:30' <= current_time and current_time < '08:59:50':
             if len(self.robots) > 0:
                 for r in self.robots:
@@ -3473,7 +3474,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # 프로그램 실행 후 5분 마다 실행 : 구글 스프레드 시트 오류 확인
     def OnGoogleCheck(self):
         print('OnGoogleCheck')
-        self.updatedata(check=True)
+        self.update_googledata(check=True)
 
     # 메인 윈도우에서의 모든 액션에 대한 처리
     def MENU_Action(self, qaction):
