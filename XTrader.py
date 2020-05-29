@@ -163,7 +163,7 @@ def Telegram(str):
 with open('secret/slack_token.txt', mode='r') as tokenfile:
     SLACK_TOKEN = tokenfile.readline().strip()
 slack = Slacker(SLACK_TOKEN)
-slack_enable = True
+slack_enable = False
 def Slack(str):
     if slack_enable == True:
         slack.chat.post_message('#log', str)
@@ -301,10 +301,11 @@ class CPortStock(object):
         self.이전수량 = 0
         self.이전매수단위수 = 0
     """
-    def __init__(self, 매수일, 종목코드, 종목명, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
+    def __init__(self, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
+        self.시장 = 시장
         self.매수전략 = 매수전략
         self.매수가 = 매수가
         self.매수조건 = 매수조건
@@ -2317,6 +2318,30 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         self.d = today
 
+    # 수동 포트폴리오 생성
+    def manual_portfolio(self):
+        self.Stocklist = {
+            '000050': {'번호': 1, '종목명': '경방', '종목코드': '000050', '시장': 'KOSPI', '매수전략': '10', '매수가': [12781], '매수조건': 1,
+                       '수량': 77, '매도전략': '10', '매도가': []},
+            '064480': {'번호': 14, '종목명': '브리지텍', '종목코드': '064480', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
+                       '매수조건': 1, '수량': 310, '매도전략': '5', '매도가': [3700]},
+            '026890': {'번호': 29, '종목명': '디피씨', '종목코드': '026890', '시장': 'KOSPI', '매수전략': '10', '매수가': [11200], '매수조건': 2,
+                       '수량': 89, '매도전략': '10', '매도가': []},
+            '127120': {'번호': 38, '종목명': '디엔에이링크', '종목코드': '127120', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5718],
+                       '매수조건': 1, '수량': 174, '매도전략': '10', '매도가': []}}
+
+        self.strategy = {'전략': {'단위투자금': 1000000, '모니터링종료시간': '10:00:00', '보유일': '5', '시가위치': [1, 5],
+                                '매도구간별조건': [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]}}
+
+        for code in list(self.Stocklist.keys()):
+            self.portfolio[code] = CPortStock(종목코드=code, 종목명=self.Stocklist[code]['종목명'], 시장=self.Stocklist[code]['시장'],
+                                              매수전략=self.Stocklist[code]['매수전략'], 매수가=self.Stocklist[code]['매수가'][0],
+                                              매수조건=self.Stocklist[code]['매수조건'], 보유일=self.strategy['전략']['보유일'],
+                                              매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
+                                              매도구간별조건=self.strategy['전략']['매도구간별조건'], 매도구간=1,
+                                              수량=self.Stocklist[code]['수량'],
+                                              매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+
     # google spreadsheet 포트폴리오에 추가하기 위한 dataframe 생성
     def save_history(self, code, status, price):
         history_cols = ['번호', '종목명', '종목코드', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
@@ -2433,7 +2458,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 temp = 6
                 if band < temp: new_band = temp
                 else: new_band = band
-            elif (upperlimitcal(시가, 0, self.Stocklist[code]['시장'])) <= 현재가:  # 구간 7 상한가
+            elif (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 현재가:  # 구간 7 상한가
                 temp = 7
                 if band < temp: new_band = temp
                 else: new_band = band
@@ -2469,7 +2494,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.portfolio[code] = CPortStock(종목코드=code, 종목명=self.Stocklist[code]['종목명'],
                                               매수전략=self.Stocklist[code]['매수전략'], 매수가=self.Stocklist[code]['매수가'][0],
                                               매수조건=condition, 보유일=self.Stocklist['전략']['보유일'],
-                                              매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매수가'],
+                                              매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
                                               매도구간별조건=self.Stocklist['전략']['매도구간별조건'], 매도구간=1,
                                               수량=0, #int(self.Stocklist['전략']['단위투자금'] / self.Stocklist[code]['매수가'][0]),
                                               매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
@@ -2590,7 +2615,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 Telegram('[XTrader]정액매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                                 logger.debug('정액매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
 
-                if 종목코드 in self.매도할종목:
+                if self.portfolio.get(종목코드) is not None:
                     if self.portfolio.get(종목코드) is not None and self.주문실행중_Lock.get('S_%s' % 종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
                         sell_check, ratio = self.sell_strategy(종목코드, 시세)
                         if (sell_check == True):
@@ -2700,14 +2725,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             if self.주문번호_주문_매핑.get(주문번호) is not None:
                 주문 = self.주문번호_주문_매핑[주문번호]
                 매수가 = int(주문[2:])
-                단위체결가 = int(0 if (param['단위체결가'] is None or param['단위체결가'] == '') else param['단위체결가'])
+                # 단위체결가 = int(0 if (param['단위체결가'] is None or param['단위체결가'] == '') else param['단위체결가'])
+                체결가 = int(0 if (param['체결가'] is None or param['체결가'] == '') else param['체결가'])
 
                 # logger.debug('매수-------> %s %s %s %s %s' % (param['종목코드'], param['종목명'], 매수가, 주문수량 - 미체결수량, 미체결수량))
 
                 P = self.portfolio.get(종목코드)
                 if P is not None:
                     P.종목명 = param['종목명']
-                    P.매수가 = 단위체결가
+                    P.매수가 = 체결가 # 단위체결가
                     P.수량 = 주문수량 - 미체결수량
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
                     Slack('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' %(P.종목명, P.매수가, P.수량))
@@ -2814,8 +2840,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 for code in list(self.portfolio.keys()):
                     if self.portfolio[code].수량 == 0:
                         self.portfolio.pop(code)
-
-                self.save_port()
 
 
 ## TradeCondition
@@ -3601,7 +3625,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         current_time = current.strftime('%H:%M:%S')
 
         # 8시 25분 : 구글 시트 오류 체크 시작
-        if current_time == '08:25:00':
+        if current_time == '08:30:00':
             print('구글 시트 오류 체크 시작')
             Telegram('[XTrader]구글 시트 오류 체크 시작')
             self.checkclock = QTimer(self)
@@ -4634,13 +4658,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif reply == QMessageBox.No:
             pass
         elif reply == QMessageBox.Yes:
-            robot_found.Run(flag=False)
-            for code in list(robot_found.portfolio.keys()):
+            try:
+                robot_found.Run(flag=False)
+                for code in list(robot_found.portfolio.keys()):
                     if robot_found.portfolio[code].수량 == 0:
                         robot_found.portfolio.pop(code)
-            self.RobotView()
-            self.RobotSaveSilently()
-
+                self.RobotView()
+                self.RobotSaveSilently()
+            except Exception as e:
+                print("Robot one stop error", e)
+                logger.info("Robot one stop errer", e)
     def RobotMonitoringStop(self):
         print('RobotMonitoringStop')
         for r in self.robots:
