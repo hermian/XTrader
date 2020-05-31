@@ -2324,13 +2324,13 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     # 수동 포트폴리오 생성
     def manual_portfolio(self):
         self.Stocklist = {
-            '000050': {'번호': 1, '종목명': '경방', '종목코드': '000050', '시장': 'KOSPI', '매수전략': '10', '매수가': [12781], '매수조건': 1,
+            '000050': {'번호': 5.001, '종목명': '경방', '종목코드': '000050', '시장': 'KOSPI', '매수전략': '10', '매수가': [12781], '매수조건': 1,
                        '수량': 77, '매도전략': '10', '매도가': []},
-            '064480': {'번호': 14, '종목명': '브리지텍', '종목코드': '064480', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
+            '064480': {'번호': 5.014, '종목명': '브리지텍', '종목코드': '064480', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
                        '매수조건': 1, '수량': 310, '매도전략': '5', '매도가': [3700]},
-            '026890': {'번호': 29, '종목명': '디피씨', '종목코드': '026890', '시장': 'KOSPI', '매수전략': '10', '매수가': [11200], '매수조건': 2,
+            '026890': {'번호': 5.029, '종목명': '디피씨', '종목코드': '026890', '시장': 'KOSPI', '매수전략': '10', '매수가': [11200], '매수조건': 2,
                        '수량': 89, '매도전략': '10', '매도가': []},
-            '127120': {'번호': 38, '종목명': '디엔에이링크', '종목코드': '127120', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5718],
+            '127120': {'번호': 5.038, '종목명': '디엔에이링크', '종목코드': '127120', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5718],
                        '매수조건': 1, '수량': 174, '매도전략': '10', '매도가': []}}
 
         self.strategy = {'전략': {'단위투자금': 1000000, '모니터링종료시간': '10:00:00', '보유일': '5', '시가위치': [1, 5],
@@ -2381,23 +2381,23 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
     # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
     def set_stocklist(self, data):
-        Stocklist = dict()
-        Stocklist['컬럼명'] = list(data.columns)
+        self.Stocklist = dict()
+        self.Stocklist['컬럼명'] = list(data.columns)
         for 종목코드 in data['종목코드'].unique():
             temp_list = data[data['종목코드'] == 종목코드].values[0]
-            Stocklist[종목코드] = {
-                '번호' : int(temp_list[Stocklist['컬럼명'].index('번호')]),
-                '종목명': temp_list[Stocklist['컬럼명'].index('종목명')],
+            self.Stocklist[종목코드] = {
+                '번호' : float(temp_list[self.Stocklist['컬럼명'].index('번호')]),
+                '종목명': temp_list[self.Stocklist['컬럼명'].index('종목명')],
                 '종목코드': 종목코드,
-                '시장' : temp_list[Stocklist['컬럼명'].index('시장')],
-                '매수전략': temp_list[Stocklist['컬럼명'].index('매수전략')],
+                '시장' : temp_list[self.Stocklist['컬럼명'].index('시장')],
+                '매수전략': temp_list[self.Stocklist['컬럼명'].index('매수전략')],
                 '매수가': list(int(float(temp_list[list(data.columns).index(col)])) for col in data.columns if
                                                '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
-                '매도전략': temp_list[Stocklist['컬럼명'].index('매도전략')],
+                '매도전략': temp_list[self.Stocklist['컬럼명'].index('매도전략')],
                 '매도가': list(int(float(temp_list[list(data.columns).index(col)])) for col in data.columns if
                                                '매도가' in col and temp_list[list(data.columns).index(col)] != '')
             }
-        return Stocklist
+        return self.Stocklist
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
@@ -2810,6 +2810,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('단위투자금 : ', self.단위투자금)
                 print('로봇 수 : ', len(self.parent.robots))
+                print('Stocklist : ', self.Stocklist)
 
                 self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
                 print(self.최대포트수)
