@@ -117,7 +117,7 @@ def import_googlesheet():
             row.insert(3, market)
 
         print('[XTrader]구글 시트 확인 완료')
-        Slack('[XTrader]구글 시트 확인 완료')
+        # Slack('[XTrader]구글 시트 확인 완료')
         logger.info('[XTrader]구글 시트 확인 완료')
 
         data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
@@ -433,7 +433,7 @@ class CTrade(object):
                     ','.join(result)]
         except Exception as e:
             print('CTrade_GetStatus Error', e)
-            logger.info('CTrade_GetStatus Error', e)
+            logger.info('CTrade_GetStatus Error : %s' % e)
 
     def GenScreenNO(self):
         """
@@ -552,8 +552,8 @@ class CTrade(object):
             return order
         except Exception as e:
             print('CTradeShortTerm_KiwoomSendOrder Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_KiwoomSendOrder : %s' % (e))
-            logger.info('CTradeShortTerm_KiwoomSendOrder', e)
+            Telegram('[XTrader]CTradeShortTerm_KiwoomSendOrder : %s' % e)
+            logger.info('CTradeShortTerm_KiwoomSendOrder : %s' % e)
         # -거래구분값 확인(2자리)
         #
         # 00 : 지정가
@@ -699,8 +699,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveTrData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveTrData : %s' % (e))
-            logger.info('CTradeShortTerm_OnReceiveTrData', e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveTrData : %s' % e)
+            logger.info('CTradeShortTerm_OnReceiveTrData : %s' % e)
 
     def OnReceiveChejanData(self, sGubun, nItemCnt, sFidList):
         """
@@ -882,8 +882,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveChejanData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveChejanData : %s' % (e))
-            logger.info('CTradeShortTerm_OnReceiveChejanData', e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveChejanData : %s' % e)
+            logger.info('CTradeShortTerm_OnReceiveChejanData : %s' % e)
 
     def OnReceiveRealData(self, sRealKey, sRealType, sRealData):
         """
@@ -923,8 +923,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveRealData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData : %s' % (e))
-            logger.info('CTradeShortTerm_OnReceiveRealData', e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData : %s' % e)
+            logger.info('CTradeShortTerm_OnReceiveRealData : %s' % e)
 
     """
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
@@ -1015,8 +1015,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_정액매수 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_정액매수 : %s' % (e))
-            logger.info('CTradeShortTerm_정액매수', e)
+            Telegram('[XTrader]CTradeShortTerm_정액매수 : %s' % e)
+            logger.info('CTradeShortTerm_정액매수 : %s' % e)
 
     def 정량매도(self, sRQName, 종목코드, 매도가, 수량):
         # sRQName = '정량매도%s' % self.sScreenNo
@@ -1038,8 +1038,8 @@ class CTrade(object):
             return ret
         except Exception as e:
             print('CTradeShortTerm_정량매도 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_정량매도 : %s' % (e))
-            logger.info('CTradeShortTerm_정량매도', e)
+            Telegram('[XTrader]CTradeShortTerm_정량매도 : %s' % e)
+            logger.info('CTradeShortTerm_정량매도 : %s' % e)
 
     def 정액매도(self, sRQName, 종목코드, 매도가, 매도금액):
         # sRQName = '정액매도%s' % self.sScreenNo
@@ -2356,7 +2356,7 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
 
         except Exception as e:
             print('화면_TradeShortTerm : inquiry Error ', e)
-            logger.info('화면_TradeShortTerm : inquiry Error ', e)
+            logger.info('화면_TradeShortTerm : inquiry Error : %s' % e)
 
 
 class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
@@ -2436,8 +2436,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 history_sheet.append_row(row)
             except Exception as e:
                 print('CTradeShortTerm_save_history Error :', e)
-                Telegram('[XTrader]CTradeShortTerm_save_history Error :', e)
-                logger.info('CTradeShortTerm_save_history Error :', e)
+                Telegram('[XTrader]CTradeShortTerm_save_history Error : %s' % e)
+                logger.info('CTradeShortTerm_save_history Error : %s' % e)
 
     # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
     def set_stocklist(self, data):
@@ -2567,8 +2567,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_sell_strategy : %s' % (e))
-            logger.info('CTradeShortTerm_sell_strategy', e)
+            Telegram('[XTrader]CTradeShortTerm_sell_strategy : %s' % e)
+            logger.info('CTradeShortTerm_sell_strategy : %s' % e)
 
     # 포트폴리오 생성
     def set_portfolio(self, code, condition):
@@ -2584,8 +2584,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.Stocklist[code]['매수일'] = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
         except Exception as e:
             print('CTradeShortTerm_set_portfolio Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_set_portfolio : %s' % (e))
-            logger.info('CTradeShortTerm_set_portfolio', e)
+            Telegram('[XTrader]CTradeShortTerm_set_portfolio : %s' % e)
+            logger.info('CTradeShortTerm_set_portfolio : %s' % e)
 
     # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
     def Setting(self, sScreenNo, 매수방법='00', 매도방법='03', 종목리스트=pd.DataFrame()):
@@ -2628,8 +2628,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print(self.Stocklist)
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
-            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % (e))
-            logger.info('CTradeShortTerm_Setting Error :', e)
+            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e)
+            logger.info('CTradeShortTerm_Setting Error : %s' % e)
 
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
     def 초기조건(self, codes):
@@ -2806,8 +2806,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             """
         except Exception as e:
             print('CTradeShortTerm_실시간데이타처리 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 : %s' % (e))
-            logger.info('CTradeShortTerm_실시간데이타처리', e)
+            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 : %s' % e)
+            logger.info('CTradeShortTerm_실시간데이타처리 : %s' % e)
 
     def 접수처리(self, param):
         pass
@@ -2932,8 +2932,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             except Exception as e:
                 print('CTradeShortTerm_Run Error :', e)
-                Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % (e))
-                logger.info('CTradeShortTerm_Run Error :', e)
+                Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e)
+                logger.info('CTradeShortTerm_Run Error : %s' % e)
 
         else:
             Slack("[XTrader]%s ROBOT 실행 중지" % (self.sName))
@@ -3597,8 +3597,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             print('MainWindow_update_googledata Error', e)
-            Telegram('[XTrader]MainWindow_update_googledata Error : %s' % (e))
-            logger.info('MainWindow_update_googledata Error', e)
+            Telegram('[XTrader]MainWindow_update_googledata Error : %s' % e)
+            logger.info('MainWindow_update_googledata Error : %s' % e)
 
     """
     # 조건 검색식 읽어서 해당 종목 저장
@@ -3690,11 +3690,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.conditionLoop.exec_()
     """
 
-    # 프로그램 실행 3초 후 저장된 로봇 정보받아옴
+    # 프로그램 실행 3초 후 실행
     def OnQApplicationStarted(self):
         print("MainWindow : OnQApplicationStarted")
-        global 로봇거래계좌번호
 
+        # 1. 8시 58분 이전일 경우 5분 단위 구글시트 오퓨 체크 타이머 시작시킴
+        current = datetime.datetime.now()
+        current_time = current.strftime('%H:%M:%S')
+        if current_time <= '08:58:00':
+            print('구글 시트 오류 체크 시작')
+            Telegram('[XTrader]구글 시트 오류 체크 시작')
+            self.checkclock = QTimer(self)
+            self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
+            self.checkclock.start(300000)  # 300000초마다 타이머 작동
+
+        # 2. DB에 저장된 로봇 정보받아옴
+        global 로봇거래계좌번호
         try:
             with sqlite3.connect(DATABASE) as conn:
                 cursor = conn.cursor()
@@ -3735,12 +3746,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         current_time = current.strftime('%H:%M:%S')
 
         # 8시 25분 : 구글 시트 오류 체크 시작
-        if current_time == '08:35:00':
-            print('구글 시트 오류 체크 시작')
-            Telegram('[XTrader]구글 시트 오류 체크 시작')
-            self.checkclock = QTimer(self)
-            self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
-            self.checkclock.start(300000)  # 300000초마다 타이머 작동
+        # if current_time == '08:35:00':
+        #     print('구글 시트 오류 체크 시작')
+        #     Telegram('[XTrader]구글 시트 오류 체크 시작')
+        #     self.checkclock = QTimer(self)
+        #     self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
+        #     self.checkclock.start(300000)  # 300000초마다 타이머 작동
 
         # 8시 32분 : 종목 데이블 생성
         if current_time == '08:38:00':
@@ -3769,8 +3780,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                             self.RobotView()
             except Exception as e:
                 print('Robot Auto Run Error', e)
-                Slack('[XTrader]Robot Auto Run Error', e)
-                logger.info('Robot Auto Run Error', e)
+                Slack('[XTrader]Robot Auto Run Error : %s' % e)
+                logger.info('Robot Auto Run Error : %s' % e)
 
         # if '153600' < current_time and current_time < '153659' and self.금일백업작업중 == False and self._login == True:# and current.weekday() == 4:
         # 수능일이면 아래 시간 조건으로 수정
@@ -3818,7 +3829,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.조회제한 = 0
         # logger.info("초당제한 주문 클리어")
 
-    # 프로그램 실행 후 5분 마다 실행 : 구글 스프레드 시트 오류 확인
+    # 5분 마다 실행 : 구글 스프레드 시트 오류 확인
     def OnGoogleCheck(self):
         print('OnGoogleCheck')
         self.update_googledata(check=True)
@@ -4782,7 +4793,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.RobotSaveSilently()
             except Exception as e:
                 print("Robot one stop error", e)
-                logger.info("Robot one stop errer", e)
+                logger.info('Robot one stop erre : %s' % e)
 
     def RobotMonitoringStop(self):
         print('RobotMonitoringStop')
@@ -5132,7 +5143,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             print('RobotAutoAdd_TradeShortTerm', e)
-            Slack('[XTrader]로봇 자동추가 실패', e)
+            Slack('[XTrader]로봇 자동추가 실패 : %s' % e)
 
     """
     def RobotEdit_TradeShortTerm(self, robot):
@@ -5197,7 +5208,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             Slack('[XTrader]로봇 자동편집 완료')
         except Exception as e:
             print('RobotAutoAdd_TradeShortTerm', e)
-            Slack('[XTrader]로봇 자동편집 실패', e)
+            Slack('[XTrader]로봇 자동편집 실패 : %s' % e)
 
     def RobotAdd_TradeCondition(self):
         print("MainWindow : RobotAdd_TradeCondition")
