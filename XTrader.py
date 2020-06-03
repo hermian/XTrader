@@ -181,6 +181,8 @@ def periodcal(base_date): # 2018-06-23
     delta = (today - base_d).days # 날짜 차이 수 계산
 
     week = floor(delta / 7) # 몇 주 차이인지 계산하기 위해 7을 나누고 소수점 이하 버림
+    if week < 1: week = 1
+
     if base_d.weekday() > 4: # 주말일 경우 금요일이라고 변경함
         first_count = 4
     else:
@@ -191,7 +193,8 @@ def periodcal(base_date): # 2018-06-23
     else:
         last_count = today.weekday() # 평일은 그냥 해당 요일 사용
 
-    delta = (4 - first_count) + ((week - 1) * 5) + (last_count + 1)
+    if delta >= 3:
+        delta = (4 - first_count) + ((week - 1) * 5) + (last_count + 1)
     # 계산 방식 : A + B + C
     # 과거 일의 요일을 계산해서 해당 주에서의 워킹데이 카운트(월 ~ 금으로 최대 4일임) : A = 4 - first_count
     # 일주일에 워킹데이가 5일이므로 계산 당일(today)과 과거 일 사이에 몇 주가 있는지를 계산해서 하나 작은 수의 주가 있다고 계산 : B = (week - 1) * 5
@@ -327,6 +330,10 @@ class CPortStock(object):
         else:
             return self.매수가
 
+    def strategy5_init(self):
+        if self.매도전략 == '5':
+            self.목표도달 = False  # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
+            self.매도조건 = ''  # 구간매도 : B, 목표매도 : T​
 
 ## CTrade 거래로봇용 베이스클래스 : OpenAPI와 붙어서 주문을 내는 등을 하는 클래스
 class CTrade(object):
@@ -2002,7 +2009,18 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             '298380': {'번호': '6', '종목명': '에이비엘바이오', '종목코드': '298380', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [20200],
                        '매수조건': 1, '수량': 9, '매도전략': '5', '매도가': [21700], '매수일': '2020/06/02 09:01:22'},
             '037270': {'번호': '1', '종목명': 'YG PLUS', '종목코드': '037270', '시장': 'KOSPI', '매수전략': '10', '매수가': [1870],
-                       '매수조건': 1, '수량': 106, '매도전략': '10', '매도가': [], '매수일': '2020/06/02 09:23:23'}}
+                       '매수조건': 1, '수량': 106, '매도전략': '10', '매도가': [], '매수일': '2020/06/02 09:23:23'},
+            '054620': {'번호': '6.025', '종목명': 'APS홀딩스', '종목코드': '054620', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [9500],
+                       '매수조건': 1, '수량': 21, '매도전략': '10', '매도가': [], '매수일': '2020/06/03 09:12:15'},
+            '060720': {'번호': '6.027', '종목명': 'KH바텍', '종목코드': '060720', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [22281],
+                       '매수조건': 1, '수량': 8, '매도전략': '10', '매도가': [], '매수일': '2020/06/03 09:26:05'},
+            '182360': {'번호': '6.030', '종목명': ' 큐브엔터', '종목코드': '182360', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [4468],
+                       '매수조건': 1, '수량': 44, '매도전략': '10', '매도가': [], '매수일': '2020/06/03 09:01:59'},
+            '182400': {'번호': '6.026', '종목명': '엔케이맥스', '종목코드': '182400', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [15050],
+                       '매수조건': 1, '수량': 13, '매도전략': '10', '매도가': [], '매수일': '2020/06/03 09:01:38'},
+            '200470': {'번호': '6.021', '종목명': '에이팩트', '종목코드': '200470', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [7050],
+                       '매수조건': 1, '수량': 28, '매도전략': '10', '매도가': [], '매수일': '2020/06/03 09:10:32'}
+        }
 
         self.strategy = {'전략': {'단위투자금': 200000, '모니터링종료시간': '10:00:00', '보유일': '5', '시가위치': [1, 5],
                                 '매도구간별조건': [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]}}
@@ -2136,6 +2154,13 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
             매수가 = self.portfolio[code].매수가
 
+            # 보유일 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
+            보유기간 = periodcal(self.portfolio[code].매수일)
+            if 보유기간 >= self.portfolio[code].보유일:
+                result = True
+                qty_ratio = 1
+                return result, qty_ratio
+
             # 구간 체크용 테스트
             try:
                 temp_band = self.band_check(현재가, 매수가)
@@ -2238,6 +2263,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 logger.info('CTradeShortTerm_sell_strategy 매도전략 5 Error : %s' % e)
                 Telegram('[XTrader]CTradeShortTerm_sell_strategy 매도전략 5 Error : %s' % e)
                 result = False
+                return result, qty_ratio
 
             # print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s'%(code, 현재가, 시가, 고가, new_band, result))
             return result, qty_ratio
@@ -2246,6 +2272,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print('CTradeShortTerm_sell_strategy Error ', e)
             Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e)
             logger.info('CTradeShortTerm_sell_strategy Error : %s' % e)
+            result = False
+            qty_ratio = 1
+            return result, qty_ratio
 
     # 포트폴리오 생성
     def set_portfolio(self, code, condition):
@@ -2319,16 +2348,19 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.매수할종목.append(code)
             
         for port_code in list(self.portfolio.keys()): # 포트폴리오에 있는 종목은 '매도할종목'에 추가
-            self.Stocklist[port_code] = {
-                '번호': self.portfolio[port_code].번호,
-                '종목명':self.portfolio[port_code].종목명,
-                '종목코드':self.portfolio[port_code].종목코드,
-                '시장': self.portfolio[port_code].시장,
-                '매수전략': self.portfolio[port_code].매수전략,
-                '매수가': self.portfolio[port_code].매수가,
-                '매도전략': self.portfolio[port_code].매도전략,
-                '매도가': self.portfolio[port_code].매도가
-            }
+            # 포트폴리오에 있는 종목이 구글에서 받아서 만든 Stocklist에 없을 경우만 추가함
+            # 이 조건이 없을 경우 구글에서 받은 전략들이 아닌 과거 전략이 포트폴리오에서 넘어감
+            if port_code not in list(self.Stocklist.keys()):
+                self.Stocklist[port_code] = {
+                    '번호': self.portfolio[port_code].번호,
+                    '종목명':self.portfolio[port_code].종목명,
+                    '종목코드':self.portfolio[port_code].종목코드,
+                    '시장': self.portfolio[port_code].시장,
+                    '매수전략': self.portfolio[port_code].매수전략,
+                    '매수가': self.portfolio[port_code].매수가,
+                    '매도전략': self.portfolio[port_code].매도전략,
+                    '매도가': self.portfolio[port_code].매도가
+                }
 
             self.매도할종목.append(port_code)
 
@@ -2538,31 +2570,35 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 주문 = self.주문번호_주문_매핑[주문번호]
                 매도가 = int(주문[2:])
 
-                if 미체결수량 == 0:
-                    try:
+                try:
+                    if 미체결수량 == 0:
                         self.주문실행중_Lock.pop(주문)
+
+                        self.Stocklist[종목코드]['매도체결가'] = 매도가
+                        self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
+
+                        self.save_history(종목코드, status='매도')
                         Slack('[XTrader]매도체결완료_종목명:%s, 매도가:%s, 수량:%s' % (param['종목명'], 매도가, 주문수량))
-                        try:
-                            self.Stocklist[종목코드]['매도체결가'] = 매도가
-                            self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
-                            self.save_history(종목코드, status='매도')
-                        except Exception as e:
-                            logger.info('체결처리_매도 매매이력 Error : %s' % e)
-                            Telegram('[XTrader]체결처리_매도 매매이력 Error : %s' % e)
 
-                    except Exception as e:
-                        logger.info('체결처리_매도 POP에러 종목명:%s' % param['종목명'])
-                        Telegram('[XTrader]체결처리_매도 POP에러 종목명:%s' % param['종목명'])
+                    else:
+                        # logger.debug('매도-------> %s %s %s %s %s' % (param['종목코드'], param['종목명'], 매수가, 주문수량 - 미체결수량, 미체결수량))
+                        P = self.portfolio.get(종목코드)
+                        if P is not None:
+                            P.종목명 = param['종목명']
+                            P.수량 -= int(param['단위체결량'])
+                except Exception as e:
+                    logger.info('체결처리_매도 매매이력 Error : %s' % e)
+                    Telegram('[XTrader]체결처리_매도 매매이력 Error : %s' % e)
 
-                else:
-                    # logger.debug('매도-------> %s %s %s %s %s' % (param['종목코드'], param['종목명'], 매수가, 주문수량 - 미체결수량, 미체결수량))
+                try:
                     P = self.portfolio.get(종목코드)
                     if P is not None:
-                        P.종목명 = param['종목명']
-                        P.수량 -= int(param['단위체결량'])
                         if P.수량 == 0:
                             self.portfolio.pop(종목코드)
                             logger.info('포트폴리오POP %s ' % 종목코드)
+                except Exception as e:
+                    logger.info('체결처리_매도 POP에러 종목명:%s' % param['종목명'])
+                    Telegram('[XTrader]체결처리_매도 POP에러 종목명:%s' % param['종목명'])
 
         # 메인 화면에 반영
         self.parent.RobotView()
@@ -2570,7 +2606,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def 잔고처리(self, param):
         종목코드 = param['종목코드']
         # 매수
-        if param['매도수구분'] == '2':
+        if param['매도매수구분'] == '2':
+            print('잔고처리_매수')
             P = self.portfolio.get(종목코드)
             if P is not None:
                 P.매수가 = param['매입단가']
@@ -2584,6 +2621,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
+        # for code in list(self.portfolio.keys()):
+        #     print(self.portfolio[code].__dict__)
 
         if flag == True:
             self.KiwoomConnect()
@@ -3448,7 +3487,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.checkclock.start(300000)  # 300000초마다 타이머 작동
 
         # 8시 32분 : 종목 데이블 생성
-        if current_time == '08:38:00':
+        if current_time == '08:32:00':
             print('종목테이블 생성')
             Slack('[XTrader]종목테이블 생성')
             self.StockCodeBuild(to_db=True)
