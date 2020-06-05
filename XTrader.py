@@ -304,7 +304,7 @@ class CPortStock(object):
         self.이전수량 = 0
         self.이전매수단위수 = 0
     """
-    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
+    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0, 매수비용=0, 매도비용=0):
         self.번호 = 번호
         self.매수일 = 매수일
         self.종목코드 = 종목코드
@@ -319,6 +319,8 @@ class CPortStock(object):
         self.매도구간 = 매도구간
         self.매도가 = 매도가
         self.수량 = 수량
+        self.매수비용 = 매수비용
+        self.매도비용 = 매도비용
 
         if self.매도전략 == '5':
             self.목표도달 = False # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
@@ -330,10 +332,16 @@ class CPortStock(object):
         else:
             return self.매수가
 
-    def strategy5_init(self):
-        if self.매도전략 == '5':
-            self.목표도달 = False  # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
-            self.매도조건 = ''  # 구간매도 : B, 목표매도 : T​
+    def manual_function(self, code):
+
+        data = {'009310':690,
+                '054620':690,
+                '064820':690,
+                '226330':650,
+                '226360':690,
+                '267270':640}
+
+        self.매수비용 = data[code]
 
 ## CTrade 거래로봇용 베이스클래스 : OpenAPI와 붙어서 주문을 내는 등을 하는 클래스
 class CTrade(object):
@@ -759,7 +767,7 @@ class CTrade(object):
         try:
             # 접수
             if sGubun == "0":
-                logger.debug('OnReceiveChejanData: 접수 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
+                # logger.debug('OnReceiveChejanData: 접수 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
 
                 화면번호 = self.kiwoom.dynamicCall('GetChejanData(QString)', 920)
 
@@ -811,7 +819,7 @@ class CTrade(object):
 
                 param['체결수량'] = int(param['주문수량']) - int(param['미체결수량'])
 
-                logger.debug('계좌번호:{계좌번호} 체결시간:{체결시간} 주문번호:{주문번호} 체결번호:{체결번호} 종목코드:{종목코드} 종목명:{종목명} 체결량:{체결량} 체결가:{체결가} 단위체결가:{단위체결가} 주문수량:{주문수량} 체결수량:{체결수량} 단위체결량:{단위체결량} 미체결수량:{미체결수량} 당일매매수수료:{당일매매수수료} 당일매매세금:{당일매매세금}'.format(**param))
+                logger.debug('접수 - 주문상태:{주문상태} 계좌번호:{계좌번호} 체결시간:{체결시간} 주문번호:{주문번호} 체결번호:{체결번호} 종목코드:{종목코드} 종목명:{종목명} 체결량:{체결량} 체결가:{체결가} 단위체결가:{단위체결가} 주문수량:{주문수량} 체결수량:{체결수량} 단위체결량:{단위체결량} 미체결수량:{미체결수량} 당일매매수수료:{당일매매수수료} 당일매매세금:{당일매매세금}'.format(**param))
 
                 # if param["주문상태"] == "접수":
                 #     self.접수처리(param)
@@ -821,7 +829,7 @@ class CTrade(object):
 
             # 잔고통보
             if sGubun == "1":
-                logger.debug('OnReceiveChejanData: 잔고통보 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
+                # logger.debug('OnReceiveChejanData: 잔고통보 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
 
                 param = dict()
 
@@ -858,14 +866,7 @@ class CTrade(object):
                 param['당일실현손익률_신용'] = self.kiwoom.dynamicCall('GetChejanData(QString)', 993)
                 param['담보대출수량'] = self.kiwoom.dynamicCall('GetChejanData(QString)', 959)
 
-                try:
-                    print(param['손익율'])
-                    logger.debug('계좌번호:{계좌번호} 종목명:{종목명} 손익율:{손익율} 총매입가:{총매입가} 매입단가:{매입단가} 당일총매도손익:{당일총매도손익}'.format(**param))
-                except Exception as e:
-                    print('잔고통보 에러 : %s' % e)
-                    logger.info('잔고통보 에러 : %s' % e)
-
-                logger.debug('계좌번호:{계좌번호} 예수금:{예수금} 종목명:{종목명} 보유수량:{보유수량} 매입단가:{매입단가} 당일순매수량:{당일순매수량}'.format(**param))
+                logger.debug('잔고통보 - 계좌번호:{계좌번호} 종목명:{종목명} 보유수량:{보유수량} 매입단가:{매입단가} 총매입가:{총매입가} 손익율:{손익율} 당일총매도손익:{당일총매도손익} 당일순매수량:{당일순매수량}'.format(**param))
 
                 self.잔고처리(param)
 
@@ -2060,6 +2061,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[history_cols.index('매도구간')] + str(code_row)
                 history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
 
+                cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)
+                history_sheet.update_acell(cell, self.Stocklist[code]['매매비용'])
+
         except:
             row = []
             try:
@@ -2293,7 +2297,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                               매수조건=condition, 보유일=self.Stocklist['전략']['보유일'],
                                               매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
                                               매도구간별조건=self.Stocklist['전략']['매도구간별조건'], 매도구간=1,
-                                              수량=0, #int(self.Stocklist['전략']['단위투자금'] / self.Stocklist[code]['매수가'][0]),
+                                              수량=0,
+                                              매매비용=0,
                                               매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
             self.Stocklist[code]['매수일'] = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
 
@@ -2542,8 +2547,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         미체결수량 = int(param['미체결수량'])
         체결가 = int(0 if (param['체결가'] is None or param['체결가'] == '') else param['체결가'])  # 매입가 동일
         단위체결량 = int(0 if (param['단위체결량'] is None or param['단위체결량'] == '') else param['단위체결량'])
-        print('단위체결량', 단위체결량, type(단위체결량))
-
+        당일매매수수료 = int(0 if (param['당일매매수수료'] is None or param['당일매매수수료'] == '') else param['당일매매수수료'])
+        당일매매세금 = int(0 if (param['당일매매세금'] is None or param['당일매매세금'] == '') else param['당일매매세금'])
+        매매비용 = 당일매매수수료 + 당일매매세금
         # 매수
         if param['매도수구분'] == '2':
             print('체결처리_매수', param['매도수구분'])
@@ -2561,6 +2567,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     P.매수가 = 체결가 # 단위체결가
                     P.수량 += 단위체결량 # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                    P.매수비용 = 매매비용
                 else:
                     logger.debug('ERROR 포트에 종목이 없음 !!!!')
 
@@ -2587,21 +2594,19 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                 try:
                     if 미체결수량 == 0:
-                        print('체결처리_매도 미체결수량 == 0')
                         self.주문실행중_Lock.pop(주문)
 
-                        self.Stocklist[종목코드]['매도체결가'] = 체결가
-                        self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
-
-                        self.save_history(종목코드, status='매도')
-                        Slack('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
-
-                    else:
-                        # logger.debug('매도-------> %s %s %s %s %s' % (param['종목코드'], param['종목명'], 매수가, 주문수량 - 미체결수량, 미체결수량))
                         P = self.portfolio.get(종목코드)
                         if P is not None:
                             P.종목명 = param['종목명']
-                            # P.수량 -= 단위체결량
+                            P.매도비용 = 매매비용
+
+                        self.Stocklist[종목코드]['매도체결가'] = 체결가
+                        self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
+                        self.Stocklist[종목코드]['매매비용'] = self.portfolio[종목코드].매수비용 + self.portfolio[종목코드].매도비용
+
+                        self.save_history(종목코드, status='매도')
+                        Slack('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
                     logger.info('체결처리_매도 매매이력 Error : %s' % e)
@@ -2642,9 +2647,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
-        # for code in list(self.portfolio.keys()):
-        #     print(self.portfolio[code].__dict__)
+        for code in list(self.portfolio.keys()):
+            # print(self.portfolio[code].__dict__)
+        #     del self.portfolio[code].매매비용
+        #     self.portfolio[code].manual_function(code)
+            print(self.portfolio[code].__dict__)
 
+
+"""
         if flag == True:
             self.KiwoomConnect()
             try:
@@ -2708,6 +2718,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             # 메인 화면에 반영
             self.parent.RobotView()
+"""
 
 ## TradeCondition
 Ui_TradeCondition, QtBaseClass_TradeCondition = uic.loadUiType("./UI/TradeCondition.ui")
@@ -4487,6 +4498,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             logger.info("전체 ROBOT 실행 중지시킵니다.")
 
             self.statusbar.showMessage("전체 ROBOT 실행 중지!!!")
+
         except Exception as e:
             print("Robot all stop error", e)
             logger.info('Robot all stop error : %s' % e)
@@ -4538,9 +4550,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             try:
                 robot_found.Run(flag=False)
                 for code in list(robot_found.portfolio.keys()):
-                    # print(code, robot_found.portfolio[code].종목명, robot_found.portfolio[code].수량, type(robot_found.portfolio[code].수량))
                     if robot_found.portfolio[code].수량 == 0:
                         robot_found.portfolio.pop(code)
+
                 self.RobotView()
                 self.RobotSaveSilently()
             except Exception as e:
