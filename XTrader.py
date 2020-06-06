@@ -2048,6 +2048,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[history_cols.index('매수가')] + str(code_row)
                 history_sheet.update_acell(cell, self.portfolio[code].매수가)
 
+                cell = alpha_list[history_cols.index('매수일')] + str(code_row)
+                history_sheet.update_acell(cell, self.portfolio[code].매수일)
+
+                cell = alpha_list[history_cols.index('매수전략')] + str(code_row)
+                history_sheet.update_acell(cell, self.portfolio[code].매수전략)
+
+                cell = alpha_list[history_cols.index('매수조건')] + str(code_row)
+                history_sheet.update_acell(cell, self.portfolio[code].매수조건)
+
             elif status == '매도':
                 cell = alpha_list[history_cols.index('매도가')] + str(code_row)
                 history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
@@ -2647,14 +2656,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
-        for code in list(self.portfolio.keys()):
-            # print(self.portfolio[code].__dict__)
+        # for code in list(self.portfolio.keys()):
+        #     print(self.portfolio[code].__dict__)
         #     del self.portfolio[code].매매비용
         #     self.portfolio[code].manual_function(code)
-            print(self.portfolio[code].__dict__)
+        #     print(self.portfolio[code].__dict__)
 
 
-"""
+
         if flag == True:
             self.KiwoomConnect()
             try:
@@ -2718,7 +2727,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             # 메인 화면에 반영
             self.parent.RobotView()
-"""
+
 
 ## TradeCondition
 Ui_TradeCondition, QtBaseClass_TradeCondition = uic.loadUiType("./UI/TradeCondition.ui")
