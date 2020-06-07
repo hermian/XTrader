@@ -107,16 +107,21 @@ def import_googlesheet():
         for row in row_data[1:]:
             try:
                 code, market = get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
+                if row[4] == '': raise Exception('매수가1 공란')
+                if row[7] == '5' and row[8] == '': raise Exception('매도전략5 매도가 공란')
             except Exception as e:
                 code = ''
                 market = ''
-                Slack('[XTrader]종목명 입력 오류 : %s' % row[1])
+                if str(e) != '매수가1 공란' and str(e) != '매도전략5 매도가 공란': e = '종목명 오류'
+                print('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
+                logger.info('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
+                Slack('[XTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
             row.insert(2, code)
             row.insert(3, market)
 
         print('[XTrader]구글 시트 확인 완료')
         #Slack('[XTrader]구글 시트 확인 완료')
-        logger.info('[XTrader]구글 시트 확인 완료')
+        # logger.info('[XTrader]구글 시트 확인 완료')
 
         data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
 
