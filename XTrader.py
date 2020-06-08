@@ -2041,42 +2041,49 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                               수량=self.Stocklist[code]['수량'],
                                               매수일=self.Stocklist[code]['매수일'])
 
-    # google spreadsheet 포트폴리오에 추가하기 위한 dataframe 생성
+    # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
         history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
                         '수익률', '수익금', '세금+수수료', '확정 수익금']
 
         try:
-            code_row = history_sheet.find(self.portfolio[code].종목명).row
+            # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+            code_row = history_sheet.findall(self.portfolio[code].종목명)[-1].row
+            cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 이력에 있는 종목이 매도가 되었는지 확인
+            sell_price = history_sheet.acell(str(cell)).value
 
-            if status == '매수': # 포트폴리오 데이터 사용
-                cell = alpha_list[history_cols.index('매수가')] + str(code_row)
-                history_sheet.update_acell(cell, self.portfolio[code].매수가)
+            if sell_price == '':
+                if status == '매수': # 포트폴리오 데이터 사용
+                    cell = alpha_list[history_cols.index('매수가')] + str(code_row)
+                    history_sheet.update_acell(cell, self.portfolio[code].매수가)
 
-                cell = alpha_list[history_cols.index('매수일')] + str(code_row)
-                history_sheet.update_acell(cell, self.portfolio[code].매수일)
+                    cell = alpha_list[history_cols.index('매수일')] + str(code_row)
+                    history_sheet.update_acell(cell, self.portfolio[code].매수일)
 
-                cell = alpha_list[history_cols.index('매수전략')] + str(code_row)
-                history_sheet.update_acell(cell, self.portfolio[code].매수전략)
+                    cell = alpha_list[history_cols.index('매수전략')] + str(code_row)
+                    history_sheet.update_acell(cell, self.portfolio[code].매수전략)
 
-                cell = alpha_list[history_cols.index('매수조건')] + str(code_row)
-                history_sheet.update_acell(cell, self.portfolio[code].매수조건)
+                    cell = alpha_list[history_cols.index('매수조건')] + str(code_row)
+                    history_sheet.update_acell(cell, self.portfolio[code].매수조건)
 
-            elif status == '매도': # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
-                cell = alpha_list[history_cols.index('매도가')] + str(code_row)
-                history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
+                elif status == '매도': # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
+                    cell = alpha_list[history_cols.index('매도가')] + str(code_row)
+                    history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
 
-                cell = alpha_list[history_cols.index('매도일')] + str(code_row)
-                history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+                    cell = alpha_list[history_cols.index('매도일')] + str(code_row)
+                    history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
 
-                cell = alpha_list[history_cols.index('매도전략')] + str(code_row)
-                history_sheet.update_acell(cell, self.Stocklist[code]['매도전략'])
+                    cell = alpha_list[history_cols.index('매도전략')] + str(code_row)
+                    history_sheet.update_acell(cell, self.Stocklist[code]['매도전략'])
 
-                cell = alpha_list[history_cols.index('매도구간')] + str(code_row)
-                history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
+                    cell = alpha_list[history_cols.index('매도구간')] + str(code_row)
+                    history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
 
-                cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)
-                history_sheet.update_acell(cell, self.Stocklist[code]['매매비용'])
+                    cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)
+                    history_sheet.update_acell(cell, self.Stocklist[code]['매매비용'])
+
+            else:   # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함함
+                raise Exception('매도완료 종목')
 
         except:
             row = []
@@ -2282,8 +2289,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                     qty_ratio = 0.5
                                 elif 매도조건 == 'B':                    # 구간 매도 이력이 있을 경우 매도미실행
                                     result = False
-                                elif 매도조건 == 'T':                    # 목표가 매도 이력이 있을 경우 절반매도
-                                    qty_ratio = 0.5
+                                elif 매도조건 == 'T':                    # 목표가 매도 이력이 있을 경우 전량매도
+                                    qty_ratio = 1
 
             except Exception as e:
                 print('sell_strategy 매도전략 5 Error :', e)
@@ -2375,6 +2382,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.매수할종목.append(code)
             
         for port_code in list(self.portfolio.keys()): # 포트폴리오에 있는 종목은 '매도할종목'에 추가
+            # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
+            # 구간이 내려가는 건 반영하지 않으므로 초기화를 시켜서 다시 구간 체크 시작하기 위함
+            self.portfolio[port_code].매도구간 = 1
+
             # 포트폴리오에 있는 종목이 구글에서 받아서 만든 Stocklist에 없을 경우만 추가함
             # 이 조건이 없을 경우 구글에서 받은 전략들이 아닌 과거 전략이 포트폴리오에서 넘어감
             if port_code not in list(self.Stocklist.keys()):
@@ -2587,13 +2598,13 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
-        # for code in list(self.portfolio.keys()):
-        #     print(self.portfolio[code].__dict__)
+        for code in list(self.portfolio.keys()):
+            print(self.portfolio[code].__dict__)
         #     del self.portfolio[code].매매비용
         #     self.portfolio[code].manual_function(code)
         #     print(self.portfolio[code].__dict__)
 
-
+"""
         if flag == True:
             self.KiwoomConnect()
             try:
@@ -2657,7 +2668,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             # 메인 화면에 반영
             self.parent.RobotView()
-
+"""
 
 ## TradeCondition
 Ui_TradeCondition, QtBaseClass_TradeCondition = uic.loadUiType("./UI/TradeCondition.ui")
