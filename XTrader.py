@@ -3352,11 +3352,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(매도결과)
         code_row = history_sheet.findall(매도결과[0])[-1].row
 
+        계산수익률 = round((int(float(매도결과[3])) / int(float(매도결과[2])) - 1) * 100, 2)
+
         cell = alpha_list[history_sheet.find('매수가').col - 1] + str(code_row)  # 매입단가
         history_sheet.update_acell(cell, int(float(매도결과[2])))
 
         cell = alpha_list[history_sheet.find('매도가').col - 1] + str(code_row)  # 체결가
         history_sheet.update_acell(cell, int(float(매도결과[3])))
+
+        cell = alpha_list[history_sheet.find('수익률(계산)').col - 1] + str(code_row)  # 수익률 계산
+        history_sheet.update_acell(cell, 계산수익률)
 
         cell = alpha_list[history_sheet.find('수익률').col - 1] + str(code_row)  # 손익율
         history_sheet.update_acell(cell, 매도결과[5])
@@ -3372,7 +3377,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.update_cnt == 0:
             print('금일 실현 손익 구글 업로드 완료')
             Slack("[XTrader]금일 실현 손익 구글 업로드 완료")
-            logger.error("[XTrader]금일 실현 손익 구글 업로드 완료")
+            logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
 
     """
     # 조건 검색식 읽어서 해당 종목 저장
