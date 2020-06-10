@@ -86,6 +86,9 @@ doc_test = gc.open_by_url(testsheet_url)
 stock_sheet = doc.worksheet('종목선정') # Sheet
 history_sheet = doc_test.worksheet('매매이력')
 
+history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
+                '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
+
 # 구글 스프레드시트 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
 
@@ -120,7 +123,7 @@ def import_googlesheet():
             row.insert(3, market)
 
         print('[XTrader]구글 시트 확인 완료')
-        #Slack('[XTrader]구글 시트 확인 완료')
+        Telegram('[XTrader]구글 시트 확인 완료')
         # logger.info('[XTrader]구글 시트 확인 완료')
 
         data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
@@ -169,7 +172,7 @@ def Telegram(str):
 with open('./secret/slack_token.txt', mode='r') as tokenfile:
     SLACK_TOKEN = tokenfile.readline().strip()
 slack = Slacker(SLACK_TOKEN)
-slack_enable = False
+slack_enable = True
 def Slack(str):
     if slack_enable == True:
         slack.chat.post_message('#log', str)
@@ -310,7 +313,7 @@ class CPortStock(object):
         self.이전수량 = 0
         self.이전매수단위수 = 0
     """
-    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0, 매수비용=0, 매도비용=0):
+    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
         self.번호 = 번호
         self.매수일 = 매수일
         self.종목코드 = 종목코드
@@ -325,8 +328,6 @@ class CPortStock(object):
         self.매도구간 = 매도구간
         self.매도가 = 매도가
         self.수량 = 수량
-        self.매수비용 = 매수비용
-        self.매도비용 = 매도비용
 
         if self.매도전략 == '5':
             self.목표도달 = False # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
@@ -2043,15 +2044,27 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
-        history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
-                        '수익률', '수익금', '세금+수수료', '확정 수익금']
-
+        # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
         try:
-            # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
-            code_row = history_sheet.findall(self.portfolio[code].종목명)[-1].row
-            cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 이력에 있는 종목이 매도가 되었는지 확인
+            code_row = history_sheet.findall(self.portfolio[code].종목명)[-1].row # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
+            cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
             sell_price = history_sheet.acell(str(cell)).value
 
+            # 매도 이력은 추가 매도(매도전략5의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
+            if status == '매도':  # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
+                cell = alpha_list[history_cols.index('매도가')] + str(code_row)
+                history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
+
+                cell = alpha_list[history_cols.index('매도일')] + str(code_row)
+                history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+
+                cell = alpha_list[history_cols.index('매도전략')] + str(code_row)
+                history_sheet.update_acell(cell, self.Stocklist[code]['매도전략'])
+
+                cell = alpha_list[history_cols.index('매도구간')] + str(code_row)
+                history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
+
+            # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
             if sell_price == '':
                 if status == '매수': # 포트폴리오 데이터 사용
                     cell = alpha_list[history_cols.index('매수가')] + str(code_row)
@@ -2066,24 +2079,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     cell = alpha_list[history_cols.index('매수조건')] + str(code_row)
                     history_sheet.update_acell(cell, self.portfolio[code].매수조건)
 
-                elif status == '매도': # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
-                    cell = alpha_list[history_cols.index('매도가')] + str(code_row)
-                    history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
-
-                    cell = alpha_list[history_cols.index('매도일')] + str(code_row)
-                    history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
-
-                    cell = alpha_list[history_cols.index('매도전략')] + str(code_row)
-                    history_sheet.update_acell(cell, self.Stocklist[code]['매도전략'])
-
-                    cell = alpha_list[history_cols.index('매도구간')] + str(code_row)
-                    history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
-
-                    cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)
-                    history_sheet.update_acell(cell, self.Stocklist[code]['매매비용'])
-
-            else:   # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함함
-                raise Exception('매도완료 종목')
+            else:   # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함
+                raise Exception('매매완료 종목')
 
         except:
             row = []
@@ -2136,7 +2133,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         if strategy == '10':
             매수가 = self.Stocklist[code]['매수가'][0]
-            시가위치하한 = 매수가 * (1 - self.Stocklist['전략']['시가위치'][0] / 100)
+            시가위치하한 = 매수가 * (1 + self.Stocklist['전략']['시가위치'][0] / 100)
             시가위치상한 = 매수가 * (1 + self.Stocklist['전략']['시가위치'][1] / 100)
 
             if current_time < self.Stocklist['전략']['모니터링종료시간']:
@@ -2503,7 +2500,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         단위체결량 = int(0 if (param['단위체결량'] is None or param['단위체결량'] == '') else param['단위체결량'])
         당일매매수수료 = int(0 if (param['당일매매수수료'] is None or param['당일매매수수료'] == '') else param['당일매매수수료'])
         당일매매세금 = int(0 if (param['당일매매세금'] is None or param['당일매매세금'] == '') else param['당일매매세금'])
-        매매비용 = 당일매매수수료 + 당일매매세금
 
         # 매수
         if param['매도수구분'] == '2':
@@ -2522,7 +2518,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     P.매수가 = 체결가 # 단위체결가
                     P.수량 += 단위체결량 # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-                    P.매수비용 = 매매비용
                 else:
                     logger.error('ERROR 포트에 종목이 없음 !!!!')
 
@@ -2557,11 +2552,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         P = self.portfolio.get(종목코드)
                         if P is not None:
                             P.종목명 = param['종목명']
-                            P.매도비용 = 매매비용
 
                         self.Stocklist[종목코드]['매도체결가'] = 체결가
                         self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
-                        self.Stocklist[종목코드]['매매비용'] = self.portfolio[종목코드].매수비용 + self.portfolio[종목코드].매도비용
 
                         self.save_history(종목코드, status='매도')
 
@@ -2608,9 +2601,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
         # self.portfolio['298380'].매도전략 = '10'
-        # for code in list(self.portfolio.keys()):
-        #     print(self.portfolio[code].__dict__)
-        #     del self.portfolio[code].매매비용
+        # if flag == True:
+        #     for code in list(self.portfolio.keys()):
+        #         del self.portfolio[code].매수비용
+        #         del self.portfolio[code].매도비용
+        #         print(self.portfolio[code].__dict__)
         #     self.portfolio[code].manual_function(code)
         #     print(self.portfolio[code].__dict__)
 
@@ -3293,35 +3288,56 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             data = import_googlesheet()
 
             if check == False:
-                # 매수 전략 확인
-                strategy_list = list(data['매수전략'].unique())
+                # # 매수 전략별 별도 로봇 운영 시
+                # # 매수 전략 확인
+                # strategy_list = list(data['매수전략'].unique())
+                #
+                # # 로딩된 로봇을 robot_list에 저장
+                # robot_list = []
+                # for robot in self.robots:
+                #     robot_list.append(robot.sName.split('_')[0])
+                #
+                # # 매수 전략별 로봇 자동 편집/추가
+                # for strategy in strategy_list:
+                #     df_stock = data[data['매수전략'] == strategy]
+                #
+                #     if strategy in robot_list:
+                #         print('로봇 편집')
+                #         Telegram('[XTrader]로봇 편집')
+                #         for robot in self.robots:
+                #             if robot.sName.split('_')[0] == strategy:
+                #                 self.RobotAutoEdit_TradeShortTerm(robot, df_stock)
+                #                 self.RobotView()
+                #                 break
+                #     else:
+                #         print('로봇 추가')
+                #         Telegram('[XTrader]로봇 추가')
+                #         self.RobotAutoAdd_TradeShortTerm(df_stock, strategy)
+                #         self.RobotView()
 
                 # 로딩된 로봇을 robot_list에 저장
                 robot_list = []
                 for robot in self.robots:
-                    robot_list.append(robot.sName.split('_')[0])
+                    robot_list.append(robot.sName)
 
-                # 매수 전략별 로봇 자동 편집/추가
-                for strategy in strategy_list:
-                    df_stock = data[data['매수전략'] == strategy]
+                if 'TradeShortTerm' in robot_list:
+                    for robot in self.robots:
+                        if robot.sName == 'TradeShortTerm':
+                            print('로봇 편집')
+                            logger.debug('로봇 편집')
+                            self.RobotAutoEdit_TradeShortTerm(robot, data)
+                            self.RobotView()
+                            break
 
-                    if strategy in robot_list:
-                        print('로봇 편집')
-                        Telegram('[XTrader]로봇 편집')
-                        for robot in self.robots:
-                            if robot.sName.split('_')[0] == strategy:
-                                self.RobotAutoEdit_TradeShortTerm(robot, df_stock)
-                                self.RobotView()
-                                break
-                    else:
-                        print('로봇 추가')
-                        Telegram('[XTrader]로봇 추가')
-                        self.RobotAutoAdd_TradeShortTerm(df_stock, strategy)
-                        self.RobotView()
+                else:
+                    print('로봇 추가')
+                    logger.debug('로봇 추가')
+                    self.RobotAutoAdd_TradeShortTerm(data)
+                    self.RobotView()
 
-                print("로봇 준비 완료")
-                Slack('[XTrader]로봇 준비 완료')
-                logger.info("로봇 준비 완료")
+                # print("로봇 준비 완료")
+                # Slack('[XTrader]로봇 준비 완료')
+                # logger.info("로봇 준비 완료")
 
         except Exception as e:
             print('MainWindow_update_googledata Error', e)
@@ -3354,22 +3370,22 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         계산수익률 = round((int(float(매도결과[3])) / int(float(매도결과[2])) - 1) * 100, 2)
 
-        cell = alpha_list[history_sheet.find('매수가').col - 1] + str(code_row)  # 매입단가
+        cell = alpha_list[history_cols.index('매수가')] + str(code_row)  # 매입단가
         history_sheet.update_acell(cell, int(float(매도결과[2])))
 
-        cell = alpha_list[history_sheet.find('매도가').col - 1] + str(code_row)  # 체결가
+        cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 체결가
         history_sheet.update_acell(cell, int(float(매도결과[3])))
 
-        cell = alpha_list[history_sheet.find('수익률(계산)').col - 1] + str(code_row)  # 수익률 계산
+        cell = alpha_list[history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
         history_sheet.update_acell(cell, 계산수익률)
 
-        cell = alpha_list[history_sheet.find('수익률').col - 1] + str(code_row)  # 손익율
+        cell = alpha_list[history_cols.index('수익률')] + str(code_row)  # 손익율
         history_sheet.update_acell(cell, 매도결과[5])
 
-        cell = alpha_list[history_sheet.find('수익금').col - 1] + str(code_row)  # 손익율
+        cell = alpha_list[history_cols.index('수익금')] + str(code_row)  # 손익율
         history_sheet.update_acell(cell, int(float(매도결과[4])))
 
-        cell = alpha_list[history_sheet.find('세금+수수료').col - 1] + str(code_row)  # 당일매매수수료 + 당일매매세금
+        cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)  # 당일매매수수료 + 당일매매세금
         history_sheet.update_acell(cell, int(float(매도결과[6])) + int(float(매도결과[7])))
 
         self.DailyProfitLoop.exit()
@@ -3556,7 +3572,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 logger.error('Robot Auto Run Error : %s' % e)
 
         # 15시 30분 : 로봇 정지
-        if '15:30:00' <= current_time and current_time < '15:30:20':
+        if '15:30:00' <= current_time and current_time < '15:30:05':
             self.RobotStop()
             Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
 
@@ -3754,7 +3770,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.RobotOneStop()
             self.RobotView()
         elif _action == "actionRobotMonitoringStop":
-            self.RobotMonitoringStop()
+            self.RobotOneMonitoringStop()
             self.RobotView()
         elif _action == "actionRobotRun":
             self.RobotRun()
@@ -3781,8 +3797,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # futurecodelist = self.kiwoom.dynamicCall('GetFutureList')
             # codes = futurecodelist.split(';')
             # print(futurecodelist)
-            종목리스트 = ['091700','267270','147760','041140','226360','003000','019540']
-            self.DailyProfit(종목리스트)
+
+            # 종목리스트 = ['298380','061970','119650']
+            # self.DailyProfit(종목리스트)
+
+            self.update_googledata(check=False)
 
     # -------------------------------------------
     # 키움증권 OpenAPI
@@ -3911,7 +3930,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if nErrCode == 0:
             # self.kiwoom.dynamicCall("KOA_Functions(QString, QString)", ["ShowAccountWindow", ""]) # 계좌 비밀번호 등록 창 실행(자동화를 위해서 AUTO 설정 후 등록 창 미실행
             self.statusbar.showMessage("로그인 성공")
-            Slack("[XTrader]키움API 로그인 성공")
+
+            current = datetime.datetime.now().strftime('%H:%M:%S')
+            if current <= '08:58:00':
+                Slack("[XTrader]키움API 로그인 성공")
 
             로그인상태 = True
             # 로그인 성공하고 바로 계좌 및 보유 주식 목록 저장
@@ -4563,32 +4585,51 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if robot_found == None:
             return
 
-        reply = QMessageBox.question(self,
-                                     "로봇 실행 중지", "로봇 실행을 중지할까요?\n%s" % robot_found.GetStatus(),
-                                     QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
-        if reply == QMessageBox.Cancel:
-            pass
-        elif reply == QMessageBox.No:
-            pass
-        elif reply == QMessageBox.Yes:
-            try:
-                if robot_found.running == True:
-                    robot_found.Run(flag=False)
-                    for code in list(robot_found.portfolio.keys()):
-                        if robot_found.portfolio[code].수량 == 0:
-                            robot_found.portfolio.pop(code)
+        # reply = QMessageBox.question(self,
+        #                              "로봇 실행 중지", "로봇 실행을 중지할까요?\n%s" % robot_found.GetStatus(),
+        #                              QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+        # if reply == QMessageBox.Cancel:
+        #     pass
+        # elif reply == QMessageBox.No:
+        #     pass
+        # elif reply == QMessageBox.Yes:
+        try:
+            if robot_found.running == True:
+                robot_found.Run(flag=False)
+                for code in list(robot_found.portfolio.keys()):
+                    if robot_found.portfolio[code].수량 == 0:
+                        robot_found.portfolio.pop(code)
 
-                self.RobotView()
-                self.RobotSaveSilently()
-            except Exception as e:
-                print("Robot one stop error", e)
-                logger.error('Robot one stop error : %s' % e)
+            self.RobotView()
+            self.RobotSaveSilently()
+        except Exception as e:
+            print("Robot one stop error", e)
+            logger.error('Robot one stop error : %s' % e)
 
-    def RobotMonitoringStop(self):
+    def RobotOneMonitoringStop(self):
         print('RobotMonitoringStop')
+        try:
+            RobotUUID = \
+            self.model._data[self.tableView_robot_current_index.row():self.tableView_robot_current_index.row() + 1][
+                'RobotID'].values[0]
+        except Exception as e:
+            RobotUUID = ''
+
+        robot_found = None
         for r in self.robots:
-            print(r.매수할종목)
-            r.매수할종목 = []
+            if r.UUID == RobotUUID:
+                robot_found = r
+                break
+
+        if robot_found == None:
+            return
+
+        if robot_found.running == True:
+            print('Robot_%s : 매수 모니터링 정지' % robot_found.sName)
+            print(robot_found.매수할종목)
+            robot_found.매수할종목 = []
+            logger.info('Robot_%s : 매수 모니터링 정지' % robot_found.sName)
+            Slack('[XTrade]Robot_%s : 매수 모니터링 정지' % robot_found.sName)
 
     def RobotLoad(self):
         reply = QMessageBox.question(self,
@@ -4917,7 +4958,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print('RobotAdd_TradeShortTerm', e)
 
-    def RobotAutoAdd_TradeShortTerm(self, data, strategy):
+    def RobotAutoAdd_TradeShortTerm(self, data): #, strategy):
         # print("MainWindow : RobotAutoAdd_TradeShortTerm")
         try:
             스크린번호 = self.GetUnAssignedScreenNumber()
@@ -5161,7 +5202,9 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
 
-    Slack("[XTrader]프로그램이 실행되었습니다.")
+    current = datetime.datetime.now().strftime('%H:%M:%S')
+    if current <= '08:58:00':
+        Slack("[XTrader]프로그램이 실행되었습니다.")
 
 
     # 프로그램 실행 후 3초 후에 한번 신호 받고, 그 다음 1초 마다 신호를 계속 받음
