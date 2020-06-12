@@ -19,6 +19,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import (QApplication, QLabel, QLineEdit, QMainWindow, QDialog, QMessageBox, QProgressBar)
 from PyQt5.QtWidgets import *
 from PyQt5.QAxContainer import *
+import icons
 
 import numpy as np
 from numpy import NaN, Inf, arange, isscalar, asarray, array
@@ -84,7 +85,7 @@ doc_test = gc.open_by_url(testsheet_url)
 
 # stock_sheet = doc.worksheet('test') # Test Sheet
 stock_sheet = doc.worksheet('종목선정') # Sheet
-history_sheet = doc_test.worksheet('매매이력')
+history_sheet = doc.worksheet('매매이력')
 
 history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
                 '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
@@ -172,7 +173,7 @@ def Telegram(str):
 with open('./secret/slack_token.txt', mode='r') as tokenfile:
     SLACK_TOKEN = tokenfile.readline().strip()
 slack = Slacker(SLACK_TOKEN)
-slack_enable = True
+slack_enable = False
 def Slack(str):
     if slack_enable == True:
         slack.chat.post_message('#log', str)
@@ -2178,10 +2179,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         # print('%s 매도 조건 확인' % code)
         try:
             result = False
-            band = self.portfolio[code].매도구간
-            new_band = 1
-
-            strategy = self.portfolio[code].매도전략
 
             현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
             매수가 = self.portfolio[code].매수가
@@ -2193,114 +2190,94 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 qty_ratio = 1
                 return result, qty_ratio
 
-            # 구간 체크용 테스트
+            # 구간 체크
             try:
-                temp_band = self.profit_band_check(현재가, 매수가)
-
-                if (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 현재가:
-                    temp_band = 7
-                # print('band, temp_band', band, temp_band)
-                if band < temp_band:
-                    new_band = temp_band
-                else:
-                    new_band = band
+                band = self.profit_band_check(고가, 매수가)
+                if (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 고가:
+                    band = 7
 
             except Exception as e:
                 print('sell_strategy 구간 체크 Error :', e)
                 logger.error('CTradeShortTerm_sell_strategy 구간 체크 Error : %s' % e)
                 Telegram('[XTrader]CTradeShortTerm_sell_strategy 구간 체크 Error : %s' % e)
 
-                if (매수가 * 1.03) <= 현재가 and 현재가 < (매수가 * 1.05):  # 구간 2
-                    temp = 2
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                elif (매수가 * 1.05) <= 현재가 and 현재가 < (매수가 * 1.1):  # 구간 3
-                    temp = 3
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                elif (매수가 * 1.1) <= 현재가 and 현재가 < (매수가 * 1.15):  # 구간 4
-                    temp = 4
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                elif (매수가 * 1.15) <= 현재가 and 현재가 < (매수가 * 1.2):  # 구간 5
-                    temp = 5
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                elif (매수가 * 1.25) <= 현재가:  # 구간 6
-                    temp = 6
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                elif (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 현재가:  # 구간 7 상한가
-                    temp = 7
-                    if band < temp: new_band = temp
-                    else: new_band = band
-                else:
-                    new_band = band
-            # print('new_band', new_band)
+                if (매수가 * 1.03) <= 고가 and 고가 < (매수가 * 1.05):
+                    band = 2
+                elif (매수가 * 1.05) <= 고가 and 고가 < (매수가 * 1.1):
+                    band = 3
+                elif (매수가 * 1.1) <= 고가 and 고가 < (매수가 * 1.15):
+                    band = 4
+                elif (매수가 * 1.15) <= 고가 and 고가 < (매수가 * 1.2):
+                    band = 5
+                elif (매수가 * 1.25) <= 고가:
+                    band = 6
+                elif (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 고가:
+                    band = 7
 
-            if new_band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
+            if band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
                 result = True
-            elif new_band == 2 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[1] / 100)):
+            elif band == 2 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[1] / 100)):
                 result = True
-            elif new_band == 3 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[2] / 100)):
+            elif band == 3 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[2] / 100)):
                 result = True
-            elif new_band == 4 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[3] / 100)):
+            elif band == 4 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[3] / 100)):
                 result = True
-            elif new_band == 5 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[4] / 100)):
+            elif band == 5 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[4] / 100)):
                 result = True
-            elif new_band == 6 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[5] / 100)):
+            elif band == 6 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[5] / 100)):
                 result = True
-            elif new_band == 7 and 현재가 >= (upperlimitcal(시가, -3, self.Stocklist[code]['시장'])):
+            elif band == 7 and 현재가 >= (upperlimitcal(시가, -3, self.Stocklist[code]['시장'])):
                 result = True
 
-            self.portfolio[code].매도구간 = new_band
+            self.portfolio[code].매도구간 = band
 
             # 구간에서의 매도 조건 만족 시(구간 컷) 매도 수량 결정
-            qty_ratio = 1 # 매도전략 10일 경우 기본 전량매도
+            qty_ratio = 1  # 매도전략 10일 경우 기본 전량매도
 
+            strategy = self.portfolio[code].매도전략
             try:
-                if strategy == '5': # 매도전략 5
+                if strategy == '5':  # 매도전략 5
                     목표가 = self.portfolio[code].매도가[0]
-                    매도조건 = self.portfolio[code].매도조건        # 매도가 실행된 조건 '': 매도 전, 'B':구간매도, 'T':목표가매도
+                    매도조건 = self.portfolio[code].매도조건  # 매도가 실행된 조건 '': 매도 전, 'B':구간매도, 'T':목표가매도
 
                     target_band = self.profit_band_check(목표가, 매수가)
 
-                    if new_band < target_band:                     # 현재가구간이 목표가구간 미만일때 전량매도
+                    if band < target_band:  # 현재가구간이 목표가구간 미만일때 전량매도
                         qty_ratio = 1
 
-                    else:                                        # 현재가구간이 목표가구간 이상일 때
-                        if 현재가 == 목표가:                      # 목표가 도달 시 절반 매도(매도실행여부는 미결정된 상태)
+                    else:  # 현재가구간이 목표가구간 이상일 때
+                        if 현재가 == 목표가:  # 목표가 도달 시 절반 매도(매도실행여부는 미결정된 상태)
                             self.portfolio[code].목표도달 = True  # 목표가 도달 여부 True
-                            if 매도조건 == '':                    # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
+                            if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
                                 self.portfolio[code].매도조건 = 'T'
                                 result = True
                                 qty_ratio = 0.5
-                            elif 매도조건 == 'B':                 # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
+                            elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
                                 result = True
                                 qty_ratio = 1
-                            elif 매도조건 == 'T':                 # 목표가 매도 이력이 있을 경우 매도미실행
+                            elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 매도미실행
                                 result = False
 
-                        else:                                         # 현재가가 목표가가 아닐 경우 구간 매도 실행(매도실행여부는 결정된 상태)
-                            if self.portfolio[code].목표도달 == False: # 목표가 도달을 못한 경우면 전량매도
+                        else:  # 현재가가 목표가가 아닐 경우 구간 매도 실행(매도실행여부는 결정된 상태)
+                            if self.portfolio[code].목표도달 == False:  # 목표가 도달을 못한 경우면 전량매도
                                 qty_ratio = 1
                             else:
-                                if 매도조건 == '':                      # 매도이력이 없는 경우 구간매도 'B', 절반 매도
+                                if 매도조건 == '':  # 매도이력이 없는 경우 구간매도 'B', 절반 매도
                                     self.portfolio[code].매도조건 = 'B'
                                     qty_ratio = 0.5
-                                elif 매도조건 == 'B':                    # 구간 매도 이력이 있을 경우 매도미실행
+                                elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 매도미실행
                                     result = False
-                                elif 매도조건 == 'T':                    # 목표가 매도 이력이 있을 경우 전량매도
+                                elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 전량매도
                                     qty_ratio = 1
 
             except Exception as e:
                 print('sell_strategy 매도전략 5 Error :', e)
-                logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code,e))
-                Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code,e))
+                logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code, e))
+                Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code, e))
                 result = False
                 return result, qty_ratio
 
-            print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s'%(code, 현재가, 시가, 고가, new_band, result))
+            print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s' % (code, 현재가, 시가, 고가, band, result))
             return result, qty_ratio
 
         except Exception as e:
@@ -2472,9 +2449,17 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
                                 Slack('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                   현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
-                                logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                   현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
+                                                                                                   현재가, self.portfolio[
+                                                                                                       종목코드].매도구간, int(
+                                    self.portfolio[종목코드].수량 * ratio)))
+                                if self.portfolio[종목코드].매도전략 == '5':
+                                    logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
+                                                                                                                      현재가,self.portfolio[종목코드].매도구간,
+                                                                                                                      self.portfolio[종목코드].목표도달,
+                                                                                                                      self.portfolio[종목코드].매도조건,int(self.portfolio[종목코드].수량 * ratio)))
+                                else:
+                                    logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                                                                                    현재가, self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                             else:
                                 Telegram('[XTrader]정액매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                         현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
@@ -2636,14 +2621,13 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 self.주문실행중_Lock = dict()
 
                 codes = list(self.Stocklist.keys())[1:-1]
-                print('종목리스트 : ', codes)
                 self.초기조건(codes)
 
                 print("매도 : ", self.매도할종목)
                 print("매수 : ", self.매수할종목)
 
 
-                self.실시간종목리스트 = self.매도할종목 + self.매수할종목 + list(self.portfolio.keys())
+                self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
                 logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
 
@@ -2665,6 +2649,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             if len(self.금일매도종목) > 0:
                 Slack("[XTrader]금일 매도 종목 손익 Upload : %s" % (self.금일매도종목))
                 logger.info("금일 매도 종목 손익 Upload : %s" % (self.금일매도종목))
+                self.parent.statusbar.showMessage("금일 매도 종목 손익 Upload")
                 self.parent.DailyProfit(self.금일매도종목)
 
             if self.portfolio is not None:
@@ -3208,15 +3193,16 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 ##################################################################################
 # 메인
 ##################################################################################
-Ui_MainWindow, QtBaseClass_MainWindow = uic.loadUiType("./UI/XTrader_MainWindow.ui")
+# Ui_MainWindow, QtBaseClass_MainWindow = uic.loadUiType("./UI/XTrader_MainWindow.ui")
+Ui_MainWindow, QtBaseClass_MainWindow = uic.loadUiType("./UI/MainWindow_new.ui")
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         # 화면을 보여주기 위한 코드
         super().__init__()
         QMainWindow.__init__(self)
         Ui_MainWindow.__init__(self)
-        self.setupUi(self)
-        self.setWindowTitle("XTrader")
+
+        self.UI_setting()
 
         # 현재 시간 받음
         self.시작시각 = datetime.datetime.now()
@@ -3264,6 +3250,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.KiwoomLogin()  # 프로그램 실행 시 자동로그인
         self.CODE_POOL = self.get_code_pool() # DB 종목데이블에서 시장구분, 코드, 종목명, 주식수, 전일종가 읽어옴
+
+    # 화면 Setting
+    def UI_setting(self):
+        self.setupUi(self)
+        self.setWindowTitle("XTrader")
+        self.setWindowIcon(QIcon('./PNG/icon_stock.png'))
+
+        self.actionLogin.setIcon(QIcon('./PNG/Internal.png'))
+        self.actionLogout.setIcon(QIcon('./PNG/External.png'))
+        self.actionExit.setIcon(QIcon('./PNG/Approval.png'))
+
+        self.actionAccountDialog.setIcon(QIcon('./PNG/Sales Performance.png'))
+        self.actionMinutePrice.setIcon(QIcon('./PNG/Candle Sticks.png'))
+        self.actionDailyPrice.setIcon(QIcon('./PNG/Overtime.png'))
+        self.actionInvestors.setIcon(QIcon('./PNG/Conference Call.png'))
+        self.actionSectorView.setIcon(QIcon('./PNG/Organization.png'))
+        self.actionSectorPriceView.setIcon(QIcon('./PNG/Ratings.png'))
+        self.actionCodeBuild.setIcon(QIcon('./PNG/Inspection.png'))
+
+        self.actionRobotOneRun.setIcon(QIcon('./PNG/Process.png'))
+        self.actionRobotOneStop.setIcon(QIcon('./PNG/Cancel 2.png'))
+        self.actionRobotMonitoringStop.setIcon(QIcon('./PNG/Cancel File.png'))
+        self.actionRobotRun.setIcon(QIcon('./PNG/Checked.png'))
+        self.actionRobotStop.setIcon(QIcon('./PNG/Cancel.png'))
+        self.actionRobotRemove.setIcon(QIcon('./PNG/Delete File.png'))
+        self.actionRobotClear.setIcon(QIcon('./PNG/Empty Trash.png'))
+        self.actionRobotView.setIcon(QIcon('./PNG/Checked 2.png'))
+        self.actionRobotSave.setIcon(QIcon('./PNG/Download.png'))
+
+        self.actionTradeShortTerm.setIcon(QIcon('./PNG/Bullish.png'))
+        self.actionTradeCondition.setIcon(QIcon('./PNG/Search.png'))
 
     # DB에 저장된 상장 종목 코드 읽음
     def get_code_pool(self):
@@ -3493,6 +3510,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if current_time <= '08:58:00':
             print('구글 시트 오류 체크 시작')
             Telegram('[XTrader]구글 시트 오류 체크 시작')
+            self.statusbar.showMessage("구글 시트 오류 체크 시작")
+
             self.checkclock = QTimer(self)
             self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
             self.checkclock.start(300000)  # 300000초마다 타이머 작동
@@ -3629,180 +3648,182 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     # 메인 윈도우에서의 모든 액션에 대한 처리
     def MENU_Action(self, qaction):
         logger.debug("Action Slot %s %s " % (qaction.objectName(), qaction.text()))
-        _action = qaction.objectName()
-        if _action == "actionExit":
-            if len(self.robots) > 0:
-                self.RobotSave()
+        try:
+            _action = qaction.objectName()
+            if _action == "actionExit":
+                if len(self.robots) > 0:
+                    self.RobotSave()
 
-            for k in self.dialog:
-                self.dialog[k].KiwoomDisConnect()
-                try:
-                    self.dialog[k].close()
-                except Exception as e:
-                    pass
+                for k in self.dialog:
+                    self.dialog[k].KiwoomDisConnect()
+                    try:
+                        self.dialog[k].close()
+                    except Exception as e:
+                        pass
 
-            self.close()
-        elif _action == "actionLogin":
-            self.KiwoomLogin()
-        elif _action == "actionLogout":
-            self.KiwoomLogout()
-        elif _action == "actionDailyPrice":
-            # self.F_dailyprice()
-            if self.dialog.get('일자별주가') is not None:
-                try:
-                    self.dialog['일자별주가'].show()
-                except Exception as e:
+                self.close()
+            elif _action == "actionLogin":
+                self.KiwoomLogin()
+            elif _action == "actionLogout":
+                self.KiwoomLogout()
+            elif _action == "actionDailyPrice":
+                # self.F_dailyprice()
+                if self.dialog.get('일자별주가') is not None:
+                    try:
+                        self.dialog['일자별주가'].show()
+                    except Exception as e:
+                        self.dialog['일자별주가'] = 화면_일별주가(sScreenNo=9902, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['일자별주가'].KiwoomConnect()
+                        self.dialog['일자별주가'].show()
+                else:
                     self.dialog['일자별주가'] = 화면_일별주가(sScreenNo=9902, kiwoom=self.kiwoom, parent=self)
                     self.dialog['일자별주가'].KiwoomConnect()
                     self.dialog['일자별주가'].show()
-            else:
-                self.dialog['일자별주가'] = 화면_일별주가(sScreenNo=9902, kiwoom=self.kiwoom, parent=self)
-                self.dialog['일자별주가'].KiwoomConnect()
-                self.dialog['일자별주가'].show()
-        elif _action == "actionMinuitePrice":
-            # self.F_minprice()
-            if self.dialog.get('분별주가') is not None:
-                try:
-                    self.dialog['분별주가'].show()
-                except Exception as e:
+            elif _action == "actionMinuitePrice":
+                # self.F_minprice()
+                if self.dialog.get('분별주가') is not None:
+                    try:
+                        self.dialog['분별주가'].show()
+                    except Exception as e:
+                        self.dialog['분별주가'] = 화면_분별주가(sScreenNo=9903, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['분별주가'].KiwoomConnect()
+                        self.dialog['분별주가'].show()
+                else:
                     self.dialog['분별주가'] = 화면_분별주가(sScreenNo=9903, kiwoom=self.kiwoom, parent=self)
                     self.dialog['분별주가'].KiwoomConnect()
                     self.dialog['분별주가'].show()
-            else:
-                self.dialog['분별주가'] = 화면_분별주가(sScreenNo=9903, kiwoom=self.kiwoom, parent=self)
-                self.dialog['분별주가'].KiwoomConnect()
-                self.dialog['분별주가'].show()
-        elif _action == "actionInvestors":
-            # self.F_investor()
-            if self.dialog.get('종목별투자자') is not None:
-                try:
-                    self.dialog['종목별투자자'].show()
-                except Exception as e:
+            elif _action == "actionInvestors":
+                # self.F_investor()
+                if self.dialog.get('종목별투자자') is not None:
+                    try:
+                        self.dialog['종목별투자자'].show()
+                    except Exception as e:
+                        self.dialog['종목별투자자'] = 화면_종목별투자자(sScreenNo=9904, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['종목별투자자'].KiwoomConnect()
+                        self.dialog['종목별투자자'].show()
+                else:
                     self.dialog['종목별투자자'] = 화면_종목별투자자(sScreenNo=9904, kiwoom=self.kiwoom, parent=self)
                     self.dialog['종목별투자자'].KiwoomConnect()
                     self.dialog['종목별투자자'].show()
-            else:
-                self.dialog['종목별투자자'] = 화면_종목별투자자(sScreenNo=9904, kiwoom=self.kiwoom, parent=self)
-                self.dialog['종목별투자자'].KiwoomConnect()
-                self.dialog['종목별투자자'].show()
-        elif _action == "actionRealDataDialog":
-            _code = '122630;114800'
-            if self.dialog.get('리얼데이타') is not None:
-                try:
-                    self.dialog['리얼데이타'].show()
-                except Exception as e:
+            elif _action == "actionRealDataDialog":
+                _code = '122630;114800'
+                if self.dialog.get('리얼데이타') is not None:
+                    try:
+                        self.dialog['리얼데이타'].show()
+                    except Exception as e:
+                        self.dialog['리얼데이타'] = 화면_실시간정보(sScreenNo=9901, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['리얼데이타'].KiwoomConnect()
+                        _screenno = self.dialog['리얼데이타'].sScreenNo
+                        self.dialog['리얼데이타'].KiwoomSetRealRemove(_screenno, _code)
+                        self.dialog['리얼데이타'].KiwoomSetRealReg(_screenno, _code, sRealType='0')
+                        self.dialog['리얼데이타'].show()
+                else:
                     self.dialog['리얼데이타'] = 화면_실시간정보(sScreenNo=9901, kiwoom=self.kiwoom, parent=self)
                     self.dialog['리얼데이타'].KiwoomConnect()
                     _screenno = self.dialog['리얼데이타'].sScreenNo
                     self.dialog['리얼데이타'].KiwoomSetRealRemove(_screenno, _code)
                     self.dialog['리얼데이타'].KiwoomSetRealReg(_screenno, _code, sRealType='0')
                     self.dialog['리얼데이타'].show()
-            else:
-                self.dialog['리얼데이타'] = 화면_실시간정보(sScreenNo=9901, kiwoom=self.kiwoom, parent=self)
-                self.dialog['리얼데이타'].KiwoomConnect()
-                _screenno = self.dialog['리얼데이타'].sScreenNo
-                self.dialog['리얼데이타'].KiwoomSetRealRemove(_screenno, _code)
-                self.dialog['리얼데이타'].KiwoomSetRealReg(_screenno, _code, sRealType='0')
-                self.dialog['리얼데이타'].show()
-        elif _action == "actionAccountDialog": # 계좌정보조회
-            if self.dialog.get('계좌정보조회') is not None: # dialog : __init__()에 dict로 정의됨
-                try:
-                    self.dialog['계좌정보조회'].show()
-                except Exception as e:
-                    self.dialog['계좌정보조회'] = 화면_계좌정보(sScreenNo=7000, kiwoom=self.kiwoom, parent=self) # self는 메인윈도우, 계좌정보윈도우는 자식윈도우/부모는 메인윈도우
+            elif _action == "actionAccountDialog": # 계좌정보조회
+                if self.dialog.get('계좌정보조회') is not None: # dialog : __init__()에 dict로 정의됨
+                    try:
+                        self.dialog['계좌정보조회'].show()
+                    except Exception as e:
+                        self.dialog['계좌정보조회'] = 화면_계좌정보(sScreenNo=7000, kiwoom=self.kiwoom, parent=self) # self는 메인윈도우, 계좌정보윈도우는 자식윈도우/부모는 메인윈도우
+                        self.dialog['계좌정보조회'].KiwoomConnect()
+                        self.dialog['계좌정보조회'].show()
+                else:
+                    self.dialog['계좌정보조회'] = 화면_계좌정보(sScreenNo=7000, kiwoom=self.kiwoom, parent=self)
                     self.dialog['계좌정보조회'].KiwoomConnect()
                     self.dialog['계좌정보조회'].show()
-            else:
-                self.dialog['계좌정보조회'] = 화면_계좌정보(sScreenNo=7000, kiwoom=self.kiwoom, parent=self)
-                self.dialog['계좌정보조회'].KiwoomConnect()
-                self.dialog['계좌정보조회'].show()
-        elif _action == "actionSectorView":
-            # self.F_sectorview()
-            if self.dialog.get('업종정보조회') is not None:
-                try:
-                    self.dialog['업종정보조회'].show()
-                except Exception as e:
+            elif _action == "actionSectorView":
+                # self.F_sectorview()
+                if self.dialog.get('업종정보조회') is not None:
+                    try:
+                        self.dialog['업종정보조회'].show()
+                    except Exception as e:
+                        self.dialog['업종정보조회'] = 화면_업종정보(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['업종정보조회'].KiwoomConnect()
+                        self.dialog['업종정보조회'].show()
+                else:
                     self.dialog['업종정보조회'] = 화면_업종정보(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
                     self.dialog['업종정보조회'].KiwoomConnect()
                     self.dialog['업종정보조회'].show()
-            else:
-                self.dialog['업종정보조회'] = 화면_업종정보(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
-                self.dialog['업종정보조회'].KiwoomConnect()
-                self.dialog['업종정보조회'].show()
-        elif _action == "actionSectorPriceView":
-            # self.F_sectorpriceview()
-            if self.dialog.get('업종별주가조회') is not None:
-                try:
-                    self.dialog['업종별주가조회'].show()
-                except Exception as e:
+            elif _action == "actionSectorPriceView":
+                # self.F_sectorpriceview()
+                if self.dialog.get('업종별주가조회') is not None:
+                    try:
+                        self.dialog['업종별주가조회'].show()
+                    except Exception as e:
+                        self.dialog['업종별주가조회'] = 화면_업종별주가(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
+                        self.dialog['업종별주가조회'].KiwoomConnect()
+                        self.dialog['업종별주가조회'].show()
+                else:
                     self.dialog['업종별주가조회'] = 화면_업종별주가(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
                     self.dialog['업종별주가조회'].KiwoomConnect()
                     self.dialog['업종별주가조회'].show()
-            else:
-                self.dialog['업종별주가조회'] = 화면_업종별주가(sScreenNo=9900, kiwoom=self.kiwoom, parent=self)
-                self.dialog['업종별주가조회'].KiwoomConnect()
-                self.dialog['업종별주가조회'].show()
-        elif _action == "actionTickLogger":
-            self.RobotAdd_TickLogger()
-            self.RobotView()
-        elif _action == "actionTickMonitor":
-            self.RobotAdd_TickMonitor()
-            self.RobotView()
-        elif _action == "actionTickTradeRSI":
-            self.RobotAdd_TickTradeRSI()
-            self.RobotView()
-        elif _action == "actionTradeShortTerm":
-            self.RobotAdd_TradeShortTerm()
-            self.RobotView()
-        elif _action == "actionTradeCondition": # 키움 조건검색식을 이용한 트레이딩
-            print("MainWindow : MENU_Action_actionTradeCondition")
-            self.RobotAdd_TradeCondition()
-            self.RobotView()
-        elif _action == "actionRobotLoad":
-            self.RobotLoad()
-            self.RobotView()
-        elif _action == "actionRobotSave":
-            self.RobotSave()
-        elif _action == "actionRobotOneRun":
-            self.RobotOneRun()
-            self.RobotView()
-        elif _action == "actionRobotOneStop":
-            self.RobotOneStop()
-            self.RobotView()
-        elif _action == "actionRobotMonitoringStop":
-            self.RobotOneMonitoringStop()
-            self.RobotView()
-        elif _action == "actionRobotRun":
-            self.RobotRun()
-            self.RobotView()
-        elif _action == "actionRobotStop":
-            self.RobotStop()
-            self.RobotView()
-        elif _action == "actionRobotRemove":
-            self.RobotRemove()
-            self.RobotView()
-        elif _action == "actionRobotClear":
-            self.RobotClear()
-            self.RobotView()
-        elif _action == "actionRobotView":
-            self.RobotView()
-            for r in self.robots:
-                logger.debug('%s %s %s %s' % (r.sName, r.UUID, len(r.portfolio), r.GetStatus()))
-        elif _action == "actionCodeBuild":
-            self.종목코드 = self.StockCodeBuild(to_db=True)
-            QMessageBox.about(self, "종목코드 생성", " %s 항목의 종목코드를 생성하였습니다." % (len(self.종목코드.index)))
-        elif _action == "actionOpenAPI_document":
-            self.kiwoom_doc()
-        elif _action == "actionTEST":
-            # futurecodelist = self.kiwoom.dynamicCall('GetFutureList')
-            # codes = futurecodelist.split(';')
-            # print(futurecodelist)
+            elif _action == "actionTickLogger":
+                self.RobotAdd_TickLogger()
+                self.RobotView()
+            elif _action == "actionTickMonitor":
+                self.RobotAdd_TickMonitor()
+                self.RobotView()
+            elif _action == "actionTickTradeRSI":
+                self.RobotAdd_TickTradeRSI()
+                self.RobotView()
+            elif _action == "actionTradeShortTerm":
+                self.RobotAdd_TradeShortTerm()
+                self.RobotView()
+            elif _action == "actionTradeCondition": # 키움 조건검색식을 이용한 트레이딩
+                print("MainWindow : MENU_Action_actionTradeCondition")
+                self.RobotAdd_TradeCondition()
+                self.RobotView()
+            elif _action == "actionRobotLoad":
+                self.RobotLoad()
+                self.RobotView()
+            elif _action == "actionRobotSave":
+                self.RobotSave()
+            elif _action == "actionRobotOneRun":
+                self.RobotOneRun()
+                self.RobotView()
+            elif _action == "actionRobotOneStop":
+                self.RobotOneStop()
+                self.RobotView()
+            elif _action == "actionRobotMonitoringStop":
+                self.RobotOneMonitoringStop()
+                self.RobotView()
+            elif _action == "actionRobotRun":
+                self.RobotRun()
+                self.RobotView()
+            elif _action == "actionRobotStop":
+                self.RobotStop()
+                self.RobotView()
+            elif _action == "actionRobotRemove":
+                self.RobotRemove()
+                self.RobotView()
+            elif _action == "actionRobotClear":
+                self.RobotClear()
+                self.RobotView()
+            elif _action == "actionRobotView":
+                self.RobotView()
+                for r in self.robots:
+                    logger.debug('%s %s %s %s' % (r.sName, r.UUID, len(r.portfolio), r.GetStatus()))
+            elif _action == "actionCodeBuild":
+                self.종목코드 = self.StockCodeBuild(to_db=True)
+                QMessageBox.about(self, "종목코드 생성", " %s 항목의 종목코드를 생성하였습니다." % (len(self.종목코드.index)))
+            elif _action == "actionOpenAPI_document":
+                self.kiwoom_doc()
+            elif _action == "actionTEST":
+                # futurecodelist = self.kiwoom.dynamicCall('GetFutureList')
+                # codes = futurecodelist.split(';')
+                # print(futurecodelist)
 
-            # 종목리스트 = ['298380','061970','119650']
-            # self.DailyProfit(종목리스트)
+                # 종목리스트 = ['298380','061970','119650']
+                # self.DailyProfit(종목리스트)
 
-            self.update_googledata(check=False)
-
+                self.update_googledata(check=False)
+        except Exception as e:
+            print(e)
     # -------------------------------------------
     # 키움증권 OpenAPI
     # -------------------------------------------
@@ -4758,7 +4779,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print('RobotEdit', e)
 
-    def robot_selected(self, QModelIndex):
+    def RobotSelected(self, QModelIndex):
         # print(self.model._data[QModelIndex.row()])
         try:
             Robot타입 = self.model._data[QModelIndex.row():QModelIndex.row() + 1]['Robot타입'].values[0]
@@ -4778,7 +4799,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print('robot_selected', e)
 
-    def robot_double_clicked(self, QModelIndex):
+    def RobotDoubleClicked(self, QModelIndex):
         self.RobotEdit(QModelIndex)
         self.RobotView()
 
