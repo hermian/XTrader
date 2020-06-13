@@ -85,6 +85,7 @@ doc_test = gc.open_by_url(testsheet_url)
 # stock_sheet = doc.worksheet('test') # Test Sheet
 stock_sheet = doc.worksheet('종목선정') # Sheet
 history_sheet = doc.worksheet('매매이력')
+condition_history_sheet = doc_test.worksheet('조건식이력')
 
 history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
                 '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
@@ -2533,6 +2534,51 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.익절 = 5 # percent
         self.손절 = -3 # percent
 
+    # google spreadsheet 매매이력 생성
+    def save_history(self, code, status):
+        # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+        history_cols = ['종목명', '매수가', '매수일','매도가', '매도일',
+                        '수익률(계산)', '수익률', '수익금', '세금+수수료', '확정 수익금']
+        try:
+            code_row = condition_history_sheet.findall(self.portfolio[code].종목명)[-1].row  # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
+            cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
+            sell_price = condition_history_sheet.acell(str(cell)).value
+
+            # 매도 이력은 추가 매도(매도전략5의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
+            if status == '매도':  # 포트폴리오 데이터 사용
+                cell = alpha_list[history_cols.index('매도가')] + str(code_row)
+                condition_history_sheet.update_acell(cell, self.portfolio[code]['매도가'])
+
+                cell = alpha_list[history_cols.index('매도일')] + str(code_row)
+                condition_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+
+            # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
+            if sell_price == '':
+                if status == '매수':  # 포트폴리오 데이터 사용
+                    cell = alpha_list[history_cols.index('매수가')] + str(code_row)
+                    condition_history_sheet.update_acell(cell, self.portfolio[code].매수가)
+
+                    cell = alpha_list[history_cols.index('매수일')] + str(code_row)
+                    condition_history_sheet.update_acell(cell, self.portfolio[code].매수일)
+
+            else:  # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함
+                raise Exception('매매완료 종목')
+
+        except:
+            row = []
+            try:
+                if status == '매수':
+                    row.append(self.portfolio[code].종목명)
+                    row.append(self.portfolio[code].매수가)
+                    row.append(self.portfolio[code].매수일)
+
+                condition_history_sheet.append_row(row)
+
+            except Exception as e:
+                print('CTradeCondition_save_history Error :', e)
+                Telegram('[XTrader]CTradeCondition_save_history Error : %s' % e)
+                logger.error('CTradeCondition_save_history Error : %s' % e)
+
     # 매도 전략
     def sell_strategy(self, code, price):
         result = False
@@ -2695,6 +2741,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         self.매수할종목.remove(종목코드)
                         self.매도할종목.append(종목코드)
 
+                        self.save_history(종목코드, status='매수')
+
                         Telegram('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
                         logger.info('%s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
                     except Exception as e:
@@ -2714,6 +2762,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         P = self.portfolio.get(종목코드)
                         if P is not None:
                             P.종목명 = param['종목명']
+
+                        self.portfolio[종목코드]['매도가'] = 체결가
+
+                        self.save_history(종목코드, status='매도')
 
                         Telegram('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
@@ -2801,6 +2853,12 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         else:
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
             self.KiwoomDisConnect()
+
+            if len(self.금일매도종목) > 0:
+                Telegram("[XTrader]금일 매도 종목 손익 Upload : %s" % (self.금일매도종목))
+                logger.info("금일 매도 종목 손익 Upload : %s" % (self.금일매도종목))
+                self.parent.statusbar.showMessage("금일 매도 종목 손익 Upload")
+                self.parent.DailyProfit(self.금일매도종목)
 
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
@@ -3146,8 +3204,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     _temp = base64.decodebytes(row[0])
                     로봇거래계좌번호 = pickle.loads(_temp)
                     print('로봇거래계좌번호', 로봇거래계좌번호)
-                cursor.execute('select uuid, strategy, name, robot from Robots')
 
+                cursor.execute('select uuid, strategy, name, robot from Robots')
                 self.robots = []
                 for row in cursor.fetchall():
                     uuid, strategy, name, robot_encoded = row
@@ -3463,6 +3521,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         global Account
         Account = self.sAccount
+        로봇거래계좌번호 = self.sAccount
         print('계좌 : ', self.sAccount)
         self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "계좌번호", self.sAccount)
         self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "d+2예수금요청", "opw00001", 0,
@@ -4270,7 +4329,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             elif reply == QMessageBox.Yes:
                 self.RobotSaveSilently()
         else:
-            QMessageBox.about(self, "Robot Save Error", "현재 설정된 로봇이 없습니다.")
+            reply = QMessageBox.question(self,
+                                         "Robot Save Error", "현재 설정된 로봇이 없습니다. DB를 삭제할까요?",
+                                         QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+            if reply == QMessageBox.Cancel:
+                pass
+            elif reply == QMessageBox.No:
+                pass
+            elif reply == QMessageBox.Yes:
+                try:
+                    with sqlite3.connect(DATABASE) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute('delete from Robots')
+                        conn.commit()
+                except Exception as e:
+                    print('RobotSaveSilently', e)
+                finally:
+                    self.statusbar.showMessage("로봇 저장 완료")
 
     def RobotSaveSilently(self):
         # sqlite3 사용
