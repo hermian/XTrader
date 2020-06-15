@@ -472,20 +472,25 @@ class CTrade(object):
         :return: 키움증권OpenAPI의 CallBack에 대응하는 처리함수를 연결
         """
         # print("CTrade : KiwoomConnect")
-        try:
-            self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect)
-            self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
-            self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].connect(self.OnReceiveTrData)
-            self.kiwoom.OnReceiveChejanData[str, int, str].connect(self.OnReceiveChejanData)
-            self.kiwoom.OnReceiveRealData[str, str, str].connect(self.OnReceiveRealData)
-
+        # try:
+        print('KiwoomConnect_1')
+        self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect)
+        print('KiwoomConnect_2')
+        self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
+        print('KiwoomConnect_3')
+        self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].connect(self.OnReceiveTrData)
+        print('KiwoomConnect_4')
+        self.kiwoom.OnReceiveChejanData[str, int, str].connect(self.OnReceiveChejanData)
+        print('KiwoomConnect_5')
+        self.kiwoom.OnReceiveRealData[str, str, str].connect(self.OnReceiveRealData)
+        print('KiwoomConnect_6')
             # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
             # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
             # self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
-        except Exception as e:
-            print("CTrade : KiwoomConnect Error")
-            print(e)
+        # except Exception as e:
+        #     print("CTrade : KiwoomConnect Error :", e)
+
         # logger.info("%s : connected" % self.sName)
 
     def KiwoomDisConnect(self):
@@ -1787,6 +1792,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         # print('%s 매도 조건 확인' % code)
         try:
             result = False
+            band = self.portfolio[code].매도구간 # 이전 매도 구간 받음
 
             현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
             매수가 = self.portfolio[code].매수가
@@ -1798,29 +1804,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 qty_ratio = 1
                 return result, qty_ratio
 
-            # 구간 체크
-            try:
-                band = self.profit_band_check(고가, 매수가)
-                if (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 고가:
-                    band = 7
+            # 매도를 위한 수익률 구간 체크(매수가 대비 현재가의 수익률 조건에 다른 구간 설정)
+            new_band = self.profit_band_check(현재가, 매수가)
+            if (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 고가:
+                band = 7
 
-            except Exception as e:
-                print('sell_strategy 구간 체크 Error :', e)
-                logger.error('CTradeShortTerm_sell_strategy 구간 체크 Error : %s' % e)
-                Telegram('[XTrader]CTradeShortTerm_sell_strategy 구간 체크 Error : %s' % e)
+            if band < new_band: # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
+                band = new_band # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
 
-                if (매수가 * 1.03) <= 고가 and 고가 < (매수가 * 1.05):
-                    band = 2
-                elif (매수가 * 1.05) <= 고가 and 고가 < (매수가 * 1.1):
-                    band = 3
-                elif (매수가 * 1.1) <= 고가 and 고가 < (매수가 * 1.15):
-                    band = 4
-                elif (매수가 * 1.15) <= 고가 and 고가 < (매수가 * 1.2):
-                    band = 5
-                elif (매수가 * 1.25) <= 고가:
-                    band = 6
-                elif (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 고가:
-                    band = 7
 
             if band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
                 result = True
@@ -1837,7 +1828,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             elif band == 7 and 현재가 >= (upperlimitcal(시가, -3, self.Stocklist[code]['시장'])):
                 result = True
 
-            self.portfolio[code].매도구간 = band
+            self.portfolio[code].매도구간 = band # 포트폴리오에 매도구간 업데이트
 
             # 구간에서의 매도 조건 만족 시(구간 컷) 매도 수량 결정
             qty_ratio = 1  # 매도전략 10일 경우 기본 전량매도
@@ -1854,7 +1845,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         qty_ratio = 1
 
                     else:  # 현재가구간이 목표가구간 이상일 때
-                        if 현재가 == 목표가:  # 목표가 도달 시 절반 매도(매도실행여부는 미결정된 상태)
+                        if 현재가 == 목표가:  # 목표가 도달 시 절반 매도
                             self.portfolio[code].목표도달 = True  # 목표가 도달 여부 True
                             if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
                                 self.portfolio[code].매도조건 = 'T'
@@ -2056,10 +2047,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                Slack('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                   현재가, self.portfolio[
-                                                                                                       종목코드].매도구간, int(
-                                    self.portfolio[종목코드].수량 * ratio)))
+                                Slack('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
+                                                                                                   self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                                 if self.portfolio[종목코드].매도전략 == '5':
                                     logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                                       현재가,self.portfolio[종목코드].매도구간,
@@ -2122,7 +2111,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                         self.save_history(종목코드, status='매수')
                         Slack('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
-                        logger.info('%s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
+                        logger.info('%s %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
+                        logger.info(self.portfolio[종목코드].__dict__)
                     except Exception as e:
                         Telegram('[XTrader]체결처리_매수 POP에러 목명:%s ' % P.종목명)
                         logger.error('체결처리_매수 POP에러 종목명:%s ' % P.종목명)
@@ -2167,7 +2157,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.parent.RobotView()
 
     def 잔고처리(self, param):
-        print('CTradeShortTerm : 잔고처리')
+        # print('CTradeShortTerm : 잔고처리')
 
         종목코드 = param['종목코드']
         P = self.portfolio.get(종목코드)
@@ -2200,21 +2190,22 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
 
         if flag == True:
-            self.KiwoomConnect() # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
+            print("%s ROBOT 실행" % (self.sName))
+
 
             try:
                 Slack("[XTrader]%s ROBOT 실행" % (self.sName))
 
-                if self.sAccount == None: self.sAccount = Account
-
+                self.sAccount = sAccount
 
                 # Stocklist가 없을 경우 구글 시트 Import 부터 실행
                 self.단위투자금 = self.Stocklist['전략']['단위투자금']
 
-                print('Robot 계좌 : ', self.sAccount)
+
+                print('로봇거래계좌 : ', 로봇거래계좌번호)
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('단위투자금 : ', self.단위투자금)
-                print('로봇 수 : ', len(self.parent.robots))
+                # print('로봇 수 : ', len(self.parent.robots))
                 print('Stocklist : ', self.Stocklist)
 
                 self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
@@ -2234,7 +2225,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
                 logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
-
+                self.KiwoomConnect()  # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
                 if len(self.실시간종목리스트) > 0:
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
                     logger.debug("실시간데이타요청 등록결과 %s" % ret)
@@ -2804,22 +2795,22 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.parent.RobotView()
 
     def Run(self, flag=True, sAccount=None):
-        print("CTradeCondition : Run")
+
 
         self.running = flag
         ret = 0
 
         if flag == True:
+            print("CTradeCondition : Run")
             self.KiwoomConnect()
 
             try:
                 logger.info("조건식 거래 로봇 실행")
 
-                if self.sAccount == None: self.sAccount = Account
+                self.sAccount = Account
 
                 self.단위투자금 = floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점버림
 
-                print('Robot 계좌 : ', self.sAccount)
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('단위투자금 : ', self.단위투자금)
 
@@ -3468,6 +3459,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # 메모리에 올라온 ActiveX와 On시리즈와 붙임(콜백 : 이벤트가 오면 나를 불러줘)
     def KiwoomConnect(self):
+        print('MainWindow KiwoomConnect')
         self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect) # 키움의 OnEventConnect와 이 프로그램의 OnEventConnect 함수와 연결시킴
         self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
         # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
@@ -3479,6 +3471,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # ActiveX와 On시리즈 연결 해제
     def KiwoomDisConnect(self):
+        print('MainWindow KiwoomDisConnect')
         self.kiwoom.OnEventConnect[int].disconnect(self.OnEventConnect)
         self.kiwoom.OnReceiveMsg[str, str, str, str].disconnect(self.OnReceiveMsg)
         # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].disconnect(self.OnReceiveTrCondition)
@@ -3521,8 +3514,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         global Account
         Account = self.sAccount
+
+        global 로봇거래계좌번호
         로봇거래계좌번호 = self.sAccount
         print('계좌 : ', self.sAccount)
+        print('로봇계좌 : ', 로봇거래계좌번호)
         self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "계좌번호", self.sAccount)
         self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "d+2예수금요청", "opw00001", 0,
                                 '{:04d}'.format(self.ScreenNumber))
@@ -4169,6 +4165,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for r in self.robots:
             # r.초기조건()
             # logger.debug('%s %s %s %s' % (r.sName, r.UUID, len(r.portfolio), r.GetStatus()))
+            print('RobotRun_로봇거래계좌번호 : ', 로봇거래계좌번호)
             r.Run(flag=True, sAccount=로봇거래계좌번호)
 
         self.statusbar.showMessage("RUN !!!")
@@ -4207,12 +4204,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def RobotOneRun(self):
         try:
+            print('index :', self.tableView_robot_current_index.row())
             RobotUUID = \
             self.model._data[self.tableView_robot_current_index.row():self.tableView_robot_current_index.row() + 1][
                 'RobotID'].values[0]
         except Exception as e:
             RobotUUID = ''
 
+        print('RobotUUID :', RobotUUID)
         robot_found = None
         for r in self.robots:
             if r.UUID == RobotUUID:
@@ -4231,14 +4230,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 'RobotID'].values[0]
         except Exception as e:
             RobotUUID = ''
+            print('RobotOneStop_1st error')
 
         robot_found = None
         for r in self.robots:
             if r.UUID == RobotUUID:
                 robot_found = r
+                print('RobotOneStop_1')
                 break
 
         if robot_found == None:
+            print('RobotOneStop_1')
             return
 
         # reply = QMessageBox.question(self,
@@ -4252,11 +4254,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         try:
             if robot_found.running == True:
                 robot_found.Run(flag=False)
-                for code in list(robot_found.portfolio.keys()):
-                    if robot_found.portfolio[code].수량 == 0:
-                        robot_found.portfolio.pop(code)
-
+                print('RobotOneStop_2')
+                # for code in list(robot_found.portfolio.keys()):
+                #     if robot_found.portfolio[code].수량 == 0:
+                #         robot_found.portfolio.pop(code)
+            print('RobotOneStop_3')
             self.RobotView()
+            print('RobotOneStop_4')
             self.RobotSaveSilently()
         except Exception as e:
             print("Robot one stop error", e)
