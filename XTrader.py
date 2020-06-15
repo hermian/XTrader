@@ -472,24 +472,18 @@ class CTrade(object):
         :return: 키움증권OpenAPI의 CallBack에 대응하는 처리함수를 연결
         """
         # print("CTrade : KiwoomConnect")
-        # try:
-        print('KiwoomConnect_1')
-        self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect)
-        print('KiwoomConnect_2')
-        self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
-        print('KiwoomConnect_3')
-        self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].connect(self.OnReceiveTrData)
-        print('KiwoomConnect_4')
-        self.kiwoom.OnReceiveChejanData[str, int, str].connect(self.OnReceiveChejanData)
-        print('KiwoomConnect_5')
-        self.kiwoom.OnReceiveRealData[str, str, str].connect(self.OnReceiveRealData)
-        print('KiwoomConnect_6')
+        try:
+            self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect)
+            self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
+            self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].connect(self.OnReceiveTrData)
+            self.kiwoom.OnReceiveChejanData[str, int, str].connect(self.OnReceiveChejanData)
+            self.kiwoom.OnReceiveRealData[str, str, str].connect(self.OnReceiveRealData)
             # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
             # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
             # self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
-        # except Exception as e:
-        #     print("CTrade : KiwoomConnect Error :", e)
+        except Exception as e:
+            print("CTrade : KiwoomConnect Error :", e)
 
         # logger.info("%s : connected" % self.sName)
 
@@ -3459,7 +3453,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # 메모리에 올라온 ActiveX와 On시리즈와 붙임(콜백 : 이벤트가 오면 나를 불러줘)
     def KiwoomConnect(self):
-        print('MainWindow KiwoomConnect')
         self.kiwoom.OnEventConnect[int].connect(self.OnEventConnect) # 키움의 OnEventConnect와 이 프로그램의 OnEventConnect 함수와 연결시킴
         self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
         # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
@@ -4204,14 +4197,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def RobotOneRun(self):
         try:
-            print('index :', self.tableView_robot_current_index.row())
             RobotUUID = \
             self.model._data[self.tableView_robot_current_index.row():self.tableView_robot_current_index.row() + 1][
                 'RobotID'].values[0]
         except Exception as e:
             RobotUUID = ''
 
-        print('RobotUUID :', RobotUUID)
         robot_found = None
         for r in self.robots:
             if r.UUID == RobotUUID:
@@ -4230,17 +4221,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 'RobotID'].values[0]
         except Exception as e:
             RobotUUID = ''
-            print('RobotOneStop_1st error')
 
         robot_found = None
         for r in self.robots:
             if r.UUID == RobotUUID:
                 robot_found = r
-                print('RobotOneStop_1')
                 break
 
         if robot_found == None:
-            print('RobotOneStop_1')
             return
 
         # reply = QMessageBox.question(self,
@@ -4254,13 +4242,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         try:
             if robot_found.running == True:
                 robot_found.Run(flag=False)
-                print('RobotOneStop_2')
-                # for code in list(robot_found.portfolio.keys()):
-                #     if robot_found.portfolio[code].수량 == 0:
-                #         robot_found.portfolio.pop(code)
-            print('RobotOneStop_3')
+                for code in list(robot_found.portfolio.keys()):
+                    if robot_found.portfolio[code].수량 == 0:
+                        robot_found.portfolio.pop(code)
+
             self.RobotView()
-            print('RobotOneStop_4')
             self.RobotSaveSilently()
         except Exception as e:
             print("Robot one stop error", e)
@@ -4380,11 +4366,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     cursor.execute("insert or replace into Robots(uuid, strategy, name, robot) values (?, ?, ?, ?)",
                                    [uuid, strategy, name, robot_encoded])
                     conn.commit()
+                    r.kiwoom = self.kiwoom
+                    r.parent = self
         except Exception as e:
             print('RobotSaveSilently', e)
         finally:
-            r.kiwoom = self.kiwoom
-            r.parent = self
             self.statusbar.showMessage("로봇 저장 완료")
 
     def RobotView(self):
