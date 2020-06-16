@@ -2977,6 +2977,7 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
 
             self.data = DataFrame(data=self.result, columns=self.columns)
             self.data['종목코드'] = "'" + self.data['종목코드']
+            self.data = self.data.drop_duplicates(['종목명', '조건식'], keep='first').reset_index(drop=True)
             print(self.data)
             self.model.update(self.data)
             # self.model.update(self.df_con)
@@ -4842,7 +4843,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         R = 화면_ConditionMonitoring(sScreenNo=스크린번호, kiwoom=self.kiwoom, parent=self)
         R.lineEdit_screen_number.setText('{:04d}'.format(스크린번호))
         if R.exec_():
-            R.data.to_csv('키움조건식_종목리스트.csv', encoding='euc-kr')
+            R.data.to_csv('키움조건식_종목리스트.csv', encoding='euc-kr', index=False)
             self.statusbar.showMessage("조건식 종목 저장 완료")
 
     # -------------------------------------------
