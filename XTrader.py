@@ -34,6 +34,9 @@ from oauth2client.service_account import ServiceAccountCredentials # (추가 설
 from df2gspread import df2gspread as d2g # (추가 설치 모듈)
 from string import ascii_uppercase # 알파벳 리스트
 
+from bs4 import BeautifulSoup
+import requests
+
 import logging
 import logging.handlers
 
@@ -239,6 +242,18 @@ def upperlimitcal(price, diff, market):
     upperlimit = int(upperlimit / hogaunit) * hogaunit + (hogaunit * diff)
 
     return upperlimit
+
+# 종목별 현재가 크롤링 ******************************************
+def crawler_price(code):
+    code = code[1:]
+    url = 'https://finance.naver.com/item/sise.nhn?code=%s' % (code)
+
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    tag = soup.find("td", {"class": "num"})
+
+    return int(tag.text.replace(',',''))
 
 
 로봇거래계좌번호 = None
@@ -2977,6 +2992,7 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
 
             self.data = DataFrame(data=self.result, columns=self.columns)
             self.data['종목코드'] = "'" + self.data['종목코드']
+            self.data = self.data.sort_values(by='조건식')
             self.data = self.data.drop_duplicates(['종목명', '조건식'], keep='first').reset_index(drop=True)
             print(self.data)
             self.model.update(self.data)
@@ -3259,7 +3275,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             Slack("[XTrader]금일 실현 손익 구글 업로드 완료")
             logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
 
-    """
+
     # 조건 검색식 읽어서 해당 종목 저장
     def GetCondition(self):
         # logger.info("조건 검색식 종목 읽기")
@@ -3279,7 +3295,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 # print(self.condition)
                 self.conditionid.append(str(index))
                 self.conditionname.append(self.condition[index])
-                # print('조건별 종목 검색 시작')
+                print(index, self.condition[index])
                 self.sendCondition("0156", self.condition[index], index, 0)
 
 
@@ -3289,6 +3305,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         finally:
             # print(self.df_condition)
+            with sqlite3.connect(DATABASE) as conn:
+                query = "select * from 조건검색식분석"
+                df = pdsql.read_sql_query(query, con=conn)
+                df = df.sort_values(by='인덱스').reset_index(drop=True)
+                df.to_csv("조건검색분석.csv", encoding='euc-kr', index=False)
+
             logger.info("조건 검색식 종목 저장완료")
             self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].disconnect(self.OnReceiveTrCondition)
             self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].disconnect(self.OnReceiveTrData)
@@ -3347,7 +3369,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # receiveTrCondition() 이벤트 메서드에서 루프 종료
         self.conditionLoop = QEventLoop()
         self.conditionLoop.exec_()
-    """
+
 
     # 프로그램 실행 3초 후 실행
     def OnQApplicationStarted(self):
@@ -3633,8 +3655,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             elif _action == "actionTest":
                 # self.금일매도종목 = ['119500']
                 # self.DailyProfit(self.금일매도종목)
-                print(self.robots[0])
-                print(self.robots[0].sName)
+                self.GetCondition()
         except Exception as e:
             print(e)
 
@@ -4197,7 +4218,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # logger.debug('main:OnReceiveRealData [%s] [%s] [%s]' % (sRealKey, sRealType, sRealData))
         pass
 
-    """
+
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
         logger.debug('main:OnReceiveTrCondition [%s] [%s] [%s] [%s] [%s]' % (
         sScrNo, strCodeList, strConditionName, nIndex, nNext))
@@ -4210,18 +4231,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # :param conditionIndex: int - 조건식 인덱스
         # :param inquiry: int - 조회구분(0: 남은데이터 없음, 2: 남은데이터 있음)
 
-
-        current = datetime.datetime.now()
-        time = str(current)[:-7] #str(current.hour) +str(current.minute) + str(current.second)
-
-        cindexs = []  # 조건식 컨디션 인덱스
-        cnames = []  # 조건식 컨디션 이름
-        codes = []
-        codenames = []
-        price = []
-        times = []
-        self.df_condition = DataFrame()
         try:
+            current = datetime.datetime.now()
+            current_time = str(current)[:-7] #str(current.hour) +str(current.minute) + str(current.second)
+
+            cindexs = []  # 조건식 컨디션 인덱스
+            cnames = []  # 조건식 컨디션 이름
+            codes = []
+            codenames = []
+            price = []
+            times = []
+            self.df_condition = DataFrame()
+
             if strCodeList == "":
                 return
             # print(nIndex, strConditionName)
@@ -4232,7 +4253,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # print(self.codeList)
 
             for code in self.codeList:
-                times.append(time)
+                times.append(current_time)
                 cindexs.append(nIndex)
                 cnames.append(strConditionName)
                 codes.append(code)
@@ -4243,14 +4264,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 #
                 # except Exception as e:
                 #     price.append(1)
-                price.append(1)
+                # price.append(1)
 
             self.df_condition['시간'] = times
             self.df_condition['인덱스'] = cindexs
             self.df_condition['조건명'] = cnames
             self.df_condition['종목코드'] = codes
+            self.df_condition['종목코드'] = "'" + self.df_condition['종목코드']
             self.df_condition['종목명'] = codenames
-            self.df_condition['현재가'] = price
+            self.df_condition['현재가'] = self.df_condition['종목코드'].apply(crawler_price)
+
+            # print(self.df_condition)
 
             with sqlite3.connect(DATABASE) as conn:
                 cursor = conn.cursor()
@@ -4263,12 +4287,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(e)
 
         finally:
-            with sqlite3.connect(DATABASE) as conn:
-                query = "select * from 조건검색식분석"
-                df = pdsql.read_sql_query(query, con=conn)
-                df.to_csv("조건검색분석.csv")
-            # Telegram(time + " : " + "조건검색식 종목 저장완료")
-            self.conditionLoop.exit()
+                time.sleep(2)
+                print(str(nIndex), strConditionName, "저장완료")
+                self.conditionLoop.exit()
 
     def OnReceiveConditionVer(self, lRet, sMsg):
         # logger.debug('main:OnReceiveConditionVer : [이벤트] 조건식 저장',lRet, sMsg)  머니봇의 오류 코드를 아래와 같이 수정하여 logger Error 방지함(18.06.13)
@@ -4296,7 +4317,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         logger.debug(
             'main:OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
         print("MainWindow : OnReceiveRealCondition")
-    """
+
 
     # ------------------------------------------------------------
     # robot 함수
@@ -4843,7 +4864,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         R = 화면_ConditionMonitoring(sScreenNo=스크린번호, kiwoom=self.kiwoom, parent=self)
         R.lineEdit_screen_number.setText('{:04d}'.format(스크린번호))
         if R.exec_():
-            R.data.to_csv('키움조건식_종목리스트.csv', encoding='euc-kr', index=False)
+            R.data.to_csv('1_키움조건식_종목리스트.csv', encoding='euc-kr', index=False)
+            print('조건식 종목 저장 완료')
             self.statusbar.showMessage("조건식 종목 저장 완료")
 
     # -------------------------------------------
