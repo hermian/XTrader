@@ -166,7 +166,7 @@ with open('./secret/telegram_token.txt', mode='r') as tokenfile:
 with open('./secret/chatid.txt', mode='r') as chatfile:
         CHAT_ID = int(chatfile.readline().strip())
 bot = telepot.Bot(TELEGRAM_TOKEN)
-telegram_enable = False
+telegram_enable = True
 def Telegram(str):
     if telegram_enable == True:
         bot.sendMessage(CHAT_ID,str)
@@ -353,15 +353,17 @@ class CPortStock_ShortTerm(object):
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 매도가=0, 손절가=0, 수량=0, 보유일=1):
+    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.매수가 = 매수가
-        self.매도가 = 매도가
-        self.손절가 = 손절가
-        self.수량 = 수량
         self.보유일 = 보유일
+        self.매도구간별조건 = 매도구간별조건
+        self.매도구간 = 매도구간
+        self.매도가 = 매도가
+        self.수량 = 수량
+
 
 
 # CTrade 거래로봇용 베이스클래스 : OpenAPI와 붙어서 주문을 내는 등을 하는 클래스
@@ -1292,6 +1294,7 @@ class 화면_분별주가(QDialog, Ui_분별주가조회):
 
     def OnReceiveTrData(self, sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage, sSPlmMsg):
         # logger.debug('OnReceiveTrData [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] ' % (sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage, sSPlmMsg))
+        print('화면_분별주가 : OnReceiveTrData')
         if self.sScreenNo != int(sScrNo):
             return
 
@@ -1313,7 +1316,7 @@ class 화면_분별주가(QDialog, Ui_분별주가조회):
                 QTimer.singleShot(주문지연, lambda: self.Request(_repeat=2))
             else:
                 df = DataFrame(data=self.result, columns=self.columns)
-                df.to_csv('분봉.csv')
+                df.to_csv('분봉.csv', encoding='euc-kr', index=False)
                 df['종목코드'] = self.종목코드
                 self.model.update(df[['종목코드'] + self.columns])
                 for i in range(len(self.columns)):
@@ -1731,10 +1734,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 '종목코드': 종목코드,
                 '시장' : temp_list[self.Stocklist['컬럼명'].index('시장')],
                 '매수전략': temp_list[self.Stocklist['컬럼명'].index('매수전략')],
-                '매수가': list(int(float(temp_list[list(data.columns).index(col)])) for col in data.columns if
+                '매수가': list(int(float(temp_list[list(data.columns).index(col)].replace(',',''))) for col in data.columns if
                                                '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
                 '매도전략': temp_list[self.Stocklist['컬럼명'].index('매도전략')],
-                '매도가': list(int(float(temp_list[list(data.columns).index(col)])) for col in data.columns if
+                '매도가': list(int(float(temp_list[list(data.columns).index(col)].replace(',',''))) for col in data.columns if
                                                '매도가' in col and temp_list[list(data.columns).index(col)] != '')
             }
         return self.Stocklist
@@ -2025,7 +2028,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         if len(self.portfolio) < self.최대포트수 and self.주문실행중_Lock.get('B_%s' % 종목코드) is None: # and self.portfolio.get(종목코드) is None
                             # 매수 전략별 모니터링 체크
                             buy_check, condition = self.buy_strategy(종목코드, 시세)
-                            if buy_check == True:
+                            if buy_check == True and (self.단위투자금 // 현재가 > 0):
                                 (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
     
                                 if result == True:
@@ -2530,7 +2533,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.보유일 = 1
         self.매수가비율 = -1.5 # percent 전일 종가 대비
         self.익절 = 5 # percent
-        self.손절 = -3 # percent
+        self.손절 = -2.7 # percent
 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
@@ -2543,7 +2546,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             # 매도 이력은 추가 매도(매도전략5의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
             if status == '매도':  # 포트폴리오 데이터 사용
                 cell = alpha_list[condition_history_cols.index('매도가')] + str(code_row)
-                condition_history_sheet.update_acell(cell, self.portfolio[code]['매도가'])
+                condition_history_sheet.update_acell(cell, self.portfolio[code].매도가)
 
                 cell = alpha_list[condition_history_cols.index('매도일')] + str(code_row)
                 condition_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
@@ -2585,7 +2588,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         # 1. 보유일 제한 매도 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
         보유기간 = periodcal(self.portfolio[code].매수일)
-        if 보유기간 >= int(self.보유일):
+        if 보유기간 >= int(self.portfolio[code].보유일):
             result = True
             sell_price = 전일종가
             return result, sell_price
@@ -2620,6 +2623,29 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def 초기조건(self, codes):  # 종목 선정
         print("CTradeCondition : 초기조건")
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
+
+        self.Stocklist = {}
+        self.Stocklist['전략'] = {
+            '단위투자금': '',
+            '보유일': 1,
+            '매도구간별조건': []
+        }
+
+        strategy_sheet = doc.worksheet('ST bot')
+        row_data = strategy_sheet.get_all_values()
+
+        for data in row_data:
+            if data[0] == '단위투자금':
+                self.Stocklist['전략']['단위투자금'] = int(data[1])
+            elif data[0] == '손절율':
+                self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
+            elif '구간' in data[0]:
+                self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
+
+        self.Stocklist['전략']['매도구간별조건'].insert(1, 0.3)
+        self.단위투자금 = self.Stocklist['전략']['단위투자금']
+
+        print(self.Stocklist)
 
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
@@ -2686,19 +2712,21 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                                 'S_%s' % 종목코드, 종목코드, 현재가, self.portfolio[종목코드].수량))
 
             # 매수할 종목에 대해서 정액매수 주문하고 포트폴리오/매도할종목에 추가, 매수할종목에서 제외
-            if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
-                if len(self.portfolio) < self.포트폴리오수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
-                    if 현재가 <= 전일종가 * (1-(abs(self.매수가비율)/100)):
-                        (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
-                        if result == True:
-                            self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 매도가1차=0, 매도가2차=0, 손절가=0,
-                                                              수량=0, 매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
-                            self.주문실행중_Lock['B_%s' % 종목코드] = True
-                            logger.info(
-                                '정액매수 : sRQName=%s, 종목코드=%s, 매수가=%s, 단위투자금=%s' % ('B_%s' % 종목코드, 종목코드, 현재가, self.단위투자금))
-                        else:
-                            logger.info('정액매수실패 : sRQName=%s, 종목코드=%s, 매수가=%s, 단위투자금=%s' % (
-                                'B_%s' % 종목코드, 종목코드, 현재가, self.단위투자금))
+            if current_time < '10:00:00':
+                if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
+                    if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
+                        if 현재가 <= 전일종가 * (1-(abs(self.매수가비율)/100)) and (self.단위투자금 // 현재가 > 0):
+                            (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
+                            if result == True:
+                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가,
+                                                                  매도구간별조건=self.Stocklist['전략']['매도구간별조건'], 보유일=self.Stocklist['전략']['보유일'],
+                                                                  매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+                                self.주문실행중_Lock['B_%s' % 종목코드] = True
+                                logger.info(
+                                    '정액매수 : sRQName=%s, 종목코드=%s, 매수가=%s, 단위투자금=%s' % ('B_%s' % 종목코드, 종목코드, 현재가, self.단위투자금))
+                            else:
+                                logger.info('정액매수실패 : sRQName=%s, 종목코드=%s, 매수가=%s, 단위투자금=%s' % (
+                                    'B_%s' % 종목코드, 종목코드, 현재가, self.단위투자금))
 
     def 접수처리(self, param):
         pass
@@ -2759,7 +2787,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         if P is not None:
                             P.종목명 = param['종목명']
 
-                        self.portfolio[종목코드]['매도가'] = 체결가
+                        self.portfolio[종목코드].매도가 = 체결가
 
                         self.save_history(종목코드, status='매도')
 
@@ -2800,8 +2828,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.parent.RobotView()
 
     def Run(self, flag=True, sAccount=None):
-
-
         self.running = flag
         ret = 0
 
@@ -2814,11 +2840,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 self.sAccount = Account
 
-                self.단위투자금 = floor(int(d2deposit.replace(",", "")) * self.단위투자비율 / 100) # floor : 소수점버림
-
-                print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
-                print('단위투자금 : ', self.단위투자금)
-
                 self.주문결과 = dict()
                 self.주문번호_주문_매핑 = dict()
                 self.주문실행중_Lock = dict()
@@ -2829,6 +2850,12 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 codes = self.종목리스트['종목코드'].values
                 self.초기조건(codes)
+
+                print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
+                print('단위투자금 : ', self.단위투자금)
+
+                self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
+                print(self.최대포트수)
 
                 print("매도 : ", self.매도할종목)
                 print("매수 : ", self.매수할종목)
@@ -2860,6 +2887,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 for code in list(self.portfolio.keys()):
                     if self.portfolio[code].수량 == 0:
                         self.portfolio.pop(code)
+
 
 class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):  #
@@ -2992,7 +3020,7 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
 
             self.data = DataFrame(data=self.result, columns=self.columns)
             self.data['종목코드'] = "'" + self.data['종목코드']
-            self.data = self.data.sort_values(by='조건식')
+            self.data = self.data.sort_values(by=['조건식', '종목명'])
             self.data = self.data.drop_duplicates(['종목명', '조건식'], keep='first').reset_index(drop=True)
             print(self.data)
             self.model.update(self.data)
@@ -3001,7 +3029,7 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
                 self.tableView.resizeColumnToContents(i)
 
         finally:
-            time.sleep(4)
+            time.sleep(2)
             self.conditionLoop.exit()
 
     # 조건식 목록 요청에 대한 응답 이벤트
@@ -3435,16 +3463,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.statusbar.showMessage("종목테이블 생성")
 
         # 8시 59분 : 구글 시트 종목 Import
-        if self.robots[0].sName == 'TradeShortTerm' and current_time == '08:59:00':
+        if current_time == '08:59:00':
             print('구글 시트 오류 체크 중지')
             Telegram('[XTrader]구글 시트 오류 체크 중지')
             self.checkclock.stop()
+            if self.robots[0].sName == 'TradeShortTerm':
+                print('구글시트 Import')
+                Slack('[XTrader]구글시트 Import')
+                self.update_googledata(check=False)
 
-            print('구글시트 Import')
-            Slack('[XTrader]구글시트 Import')
-            self.update_googledata(check=False)
-
-            self.statusbar.showMessage('구글시트 Import')
+                self.statusbar.showMessage('구글시트 Import')
 
         # 8시 59분 30초 : 로봇 실행
         if '08:59:30' <= current_time and current_time < '08:59:40':
@@ -3810,7 +3838,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def OnReceiveTrData(self, sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage,sSPlmMsg):
         # logger.debug('main:OnReceiveTrData [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] ' % (sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage, sSPlmMsg))
-        # print("MainWindow : OnReceiveTrData")
+        print("MainWindow : OnReceiveTrData")
 
         if self.ScreenNumber != int(sScrNo):
             return
