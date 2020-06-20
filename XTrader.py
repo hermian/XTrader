@@ -26,7 +26,6 @@ from numpy import NaN, Inf, arange, isscalar, asarray, array
 import pandas as pd
 import pandas.io.sql as pdsql
 from pandas import DataFrame, Series
-# from pandas.lib import Timestamp
 
 # Google SpreadSheet Read/Write
 import gspread # (추가 설치 모듈)
@@ -2277,6 +2276,8 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
         self.kiwoom = kiwoom #
         self.parent = parent
 
+        self.progressBar.setValue(0) # Progressbar 초기 셋팅
+
         self.model = PandasModel()
         self.tableView.setModel(self.model)
 
@@ -2287,6 +2288,48 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
         self.KiwoomConnect()
 
         self.GetCondition()
+
+    # 매수 종목 선정을 위한 체크 함수
+    def pick_stock(self, data):
+        row = []
+        cnt = 0
+        for code in data['종목코드']:
+            url = 'https://finance.naver.com/item/sise.nhn?code=%s' % (code)
+
+            response = requests.get(url)
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            tag = soup.find_all("td", {"class": "num"})
+            # tag = soup.find_all("span")
+
+            result = []
+            temp = []
+
+            for i in tag:
+                temp.append(i.text.replace('\t', '').replace('\n', ''))
+            result.append(code)         # 종목코드
+            result.append(int(temp[5].replace(',','')))      # 전일종가
+            # result.append(temp[7])    # 시가
+            # result.append(temp[11])   # 저가
+            # result.append(temp[9])    # 고가
+            result.append(int(temp[0].replace(',','')))      # 종가(현재가)
+            # result.append(temp[6])    # 거래량
+            row.append(result)
+
+            cnt+=1
+            # Progress Bar 디스플레이(전체 시간 대비 비율)
+            self.progressBar.setValue(cnt / len(data) * 100)
+
+        df = pd.DataFrame(data=row, columns=['종목코드', '전일종가', '종가'])
+
+        df_final = pd.merge(data, df, on='종목코드')
+        df_final = df_final.reset_index(drop=True)
+
+        df_final['등락률'] = round((df_final['종가'] - df_final['전일종가'])/df_final['전일종가'] * 100, 1)
+        df_final = df_final[df_final['등락률'] >= 1][['종목코드', '종목명', '등락률']]
+        print(df_final)
+
+        return df_final
 
     # 저장된 조건 검색식 목록 읽음
     def GetCondition(self):
@@ -2437,8 +2480,9 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
             # self.df_con['종목명'] = name
             # print(self.df_con)
 
-            self.data =DataFrame(data=self.result, columns=self.columns)
-            print(self.data)
+            self.temp = DataFrame(data=self.result, columns=self.columns)
+            print(self.temp)
+            self.data = self.pick_stock(self.temp)
             self.model.update(self.data)
             # self.model.update(self.df_con)
             for i in range(len(self.columns)):
