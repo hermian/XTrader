@@ -3035,6 +3035,8 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
         self.setWindowTitle("ConditionMonitoring")
         self.lineEdit_name.setText('ConditionMonitoring')
 
+        self.progressBar.setValue(0)  # Progressbar 초기 셋팅
+
         self.sScreenNo = sScreenNo
         self.kiwoom = kiwoom  #
         self.parent = parent
@@ -3201,11 +3203,15 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
     # 조건식 종목 검색 버튼 클릭 시 실행됨(시그널/슬롯 추가)
     def inquiry(self):
         self.result = []
-
+        cnt=0
         print('조건식 갯수 :', len(self.df_condition))
         for idx in range(len(self.df_condition)):
             print(idx, self.condition[idx])
             self.sendCondition("0156", self.condition[idx], idx, 0)
+            cnt += 1
+            # Progress Bar 디스플레이(전체 시간 대비 비율)
+            self.progressBar.setValue(cnt / len(self.df_condition) * 100)
+
         print('조건식 종목 조회 완료')
         self.parent.statusbar.showMessage("조건식 종목 조회 완료")
 
