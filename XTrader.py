@@ -53,17 +53,18 @@ def sqliteconn():
     return conn
 
 # DB에서 종목명으로 종목코드, 시장구분 반환
-def get_code(종목명):
+def get_code(종목명체크):
+    종목명체크 = 종목명체크.lower().replace(' ', '')
     query = """
-                select 종목코드, 시장구분
+                select 종목코드, 종목명, 시장구분
                 from 종목코드
-                where (종목명 = '%s')
-            """ % (종목명)
+                where (종목명체크 = '%s')
+            """ % (종목명체크)
     conn = sqliteconn()
     df = pd.read_sql(query, con=conn)
     conn.close()
 
-    return list(df[['종목코드', '시장구분']].values)[0]
+    return list(df[['종목코드', '종목명', '시장구분']].values)[0]
 
 
 # Google Spreadsheet Setting *******************************
@@ -113,7 +114,7 @@ def import_googlesheet():
 
         for row in row_data[1:]:
             try:
-                code, market = get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
+                code, name, market = get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
                 if row[3] == '' or row[7] == '': raise Exception('전략 설정 오류')
                 if row[4] == '': raise Exception('매수가1 공란')
                 if row[7] == '5' and row[8] == '': raise Exception('매도전략5 매도가 공란')
@@ -124,6 +125,7 @@ def import_googlesheet():
                 print('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
                 logger.error('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
                 Slack('[XTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
+            row[1] = name
             row.insert(2, code)
             row.insert(3, market)
 
@@ -4961,6 +4963,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 for code in codes:
                     if code is not '':
                         종목명 = self.kiwoom.dynamicCall('GetMasterCodeName(QString)', [code])
+                        종목명체크 = 종목명.lower().replace(' ','')
                         주식수 = self.kiwoom.dynamicCall('GetMasterListedStockCnt(QString)', [code])
                         감리구분 = self.kiwoom.dynamicCall('GetMasterConstruction(QString)',
                                                        [code])  # 감리구분 – 정상, 투자주의, 투자경고, 투자위험, 투자주의환기종목
@@ -4970,9 +4973,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         종목상태 = self.kiwoom.dynamicCall('GetMasterStockState(QString)', [
                             code])  # 종목상태 – 정상, 증거금100%, 거래정지, 관리종목, 감리종목, 투자유의종목, 담보대출, 액면분할, 신용가능
 
-                        result.append([marketname, code, 종목명, 주식수, 감리구분, 상장일, 전일종가, 종목상태])
+                        result.append([marketname, code, 종목명, 종목명체크, 주식수, 감리구분, 상장일, 전일종가, 종목상태])
 
-            df_code = DataFrame(data=result, columns=['시장구분', '종목코드', '종목명', '주식수', '감리구분', '상장일', '전일종가', '종목상태'])
+            df_code = DataFrame(data=result, columns=['시장구분', '종목코드', '종목명', '종목명체크', '주식수', '감리구분', '상장일', '전일종가', '종목상태'])
             # df.set_index('종목코드', inplace=True)
 
             if to_db == True:
