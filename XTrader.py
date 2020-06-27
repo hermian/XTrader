@@ -46,27 +46,6 @@ import telepot # 텔레그램봇(추가 설치 모듈)
 from slacker import Slacker # 슬랙봇(추가 설치 모듈)
 
 
-# SQLITE DB Setting *****************************************
-DATABASE = 'stockdata.db'
-def sqliteconn():
-    conn = sqlite3.connect(DATABASE)
-    return conn
-
-# DB에서 종목명으로 종목코드, 시장구분 반환
-def get_code(종목명체크):
-    종목명체크 = 종목명체크.lower().replace(' ', '')
-    query = """
-                select 종목코드, 종목명, 시장구분
-                from 종목코드
-                where (종목명체크 = '%s')
-            """ % (종목명체크)
-    conn = sqliteconn()
-    df = pd.read_sql(query, con=conn)
-    conn.close()
-
-    return list(df[['종목코드', '종목명', '시장구분']].values)[0]
-
-
 # Google Spreadsheet Setting *******************************
 scope = ['https://spreadsheets.google.com/feeds',
          'https://www.googleapis.com/auth/drive']
@@ -98,6 +77,31 @@ condition_history_cols = ['종목명', '매수가', '매수일','매도가', '�
 # 구글 스프레드시트 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
 
+
+# SQLITE DB Setting *****************************************
+DATABASE = 'stockdata.db'
+def sqliteconn():
+    conn = sqlite3.connect(DATABASE)
+    return conn
+
+# DB에서 종목명으로 종목코드, 종목영, 시장구분 반환
+def get_code(종목명체크):
+    # 종목명이 띄워쓰기, 대소문자 구분이 잘못될 것을 감안해서
+    # DB 저장 시 종목명체크 컬럼은 띄워쓰기 삭제 및 소문자로 저장됨
+    # 구글에서 받은 종목명을 띄워쓰기 삭제 및 소문자로 바꿔서 종목명체크와 일치하는 데이터 저장
+    # 종목명은 DB에 있는 정상 종목명으로 사용하도록 리턴
+    종목명체크 = 종목명체크.lower().replace(' ', '')
+    query = """
+                select 종목코드, 종목명, 시장구분
+                from 종목코드
+                where (종목명체크 = '%s')
+            """ % (종목명체크)
+    conn = sqliteconn()
+    df = pd.read_sql(query, con=conn)
+    conn.close()
+
+    return list(df[['종목코드', '종목명', '시장구분']].values)[0]
+
 # 종목코드가 int형일 경우 정상적으로 반환
 def fix_stockcode(data):
     if len(data)< 6:
@@ -108,24 +112,34 @@ def fix_stockcode(data):
 # 구글 스프레드 시트 Import후 DataFrame 반환
 def import_googlesheet():
     try:
-        row_data = stock_sheet.get_all_values()
-        row_data[0].insert(2, '종목코드') # 번호, 종목명, 매수모니터링, 매수전략, 매수가1, 매수가2, 매수가3, 매도전략, 매도가
+        row_data = stock_sheet.get_all_values() # 구글 스프레드시트 '종목선정' 시트 데이터 get
+
+        # 작성 오류 체크를 위한 주요 항목의 위치(index)를 저장
+        idx_strategy = [row_data[0].index('매수전략'), row_data[0].index('매도전략')]
+        idx_buyprice = row_data[0].index('매수가1')
+        idx_sellprice = row_data[0].index('매도가')
+
+        # DB에서 받아올 종목코드와 시장 컬럼 추가
+        # 번호, 종목명, 매수모니터링, 비중, 매수전략, 시가위치, 매수가1, 매수가2, 매수가3, 매도전략, 매도가
+        row_data[0].insert(2, '종목코드')
         row_data[0].insert(3, '시장')
 
         for row in row_data[1:]:
             try:
-                code, name, market = get_code(row[1])  # 종목명으로 종목코드 받아서(get_code 함수) 추가
-                if row[3] == '' or row[7] == '': raise Exception('전략 설정 오류')
-                if row[4] == '': raise Exception('매수가1 공란')
-                if row[7] == '5' and row[8] == '': raise Exception('매도전략5 매도가 공란')
+                code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
+                if row[idx_strategy[0]] == '' or row[idx_strategy[1]] == '': raise Exception('전략 설정 오류')  # 매수전략, 매도전략
+                if row[idx_buyprice] == '': raise Exception('매수가1 공란') # 매수가1
+                if row[idx_strategy[1]] == '5' and row[idx_sellprice] == '': raise Exception('매도전략5 매도가 공란') # 매도가
             except Exception as e:
+                name = ''
                 code = ''
                 market = ''
                 if str(e) != '매수가1 공란' and str(e) != '매도전략5 매도가 공란' and str(e) != '전략 설정 오류': e = '종목명 오류'
                 print('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
                 logger.error('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
                 Slack('[XTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
-            row[1] = name
+
+            row[1] = name # 정상 종목명으로 저장
             row.insert(2, code)
             row.insert(3, market)
 
@@ -137,7 +151,7 @@ def import_googlesheet():
 
         # 사전 데이터 정리
         data = data[(data['매수모니터링'] == '1') & (data['종목코드']!= '')]
-        data = data[['번호', '종목명', '종목코드', '시장', '매수모니터링', '매수전략', '매수가1', '매수가2', '매수가3', '매도전략', '매도가']]
+        data =  data[row_data[0][:row_data[0].index('매도가')+1]]
         del data['매수모니터링']
 
         data.to_csv('%s_googlesheetdata.csv'%(datetime.date.today().strftime('%Y%m%d')), encoding='euc-kr', index=False)
@@ -218,31 +232,34 @@ def periodcal(base_date): # 2018-06-23
 
     return delta
 
-# 상한가 호가 계산 *********************************************
-def upperlimitcal(price, diff, market):
+# 호가 계산(상한가, 현재가) *************************************
+def hogacal(price, diff, market, option):
     # diff 0 : 상한가 호가, -1 : 상한가 -1호가
-    upperlimit = price * 1.3
+    if option == '현재가':
+        cal_price = price
+    elif option == '상한가':
+        cal_price = price * 1.3
 
-    if upperlimit < 1000:
+    if cal_price < 1000:
         hogaunit = 1
-    elif upperlimit < 5000:
+    elif cal_price < 5000:
         hogaunit = 5
-    elif upperlimit < 10000:
+    elif cal_price < 10000:
         hogaunit = 10
-    elif upperlimit < 50000:
+    elif cal_price < 50000:
         hogaunit = 50
-    elif upperlimit < 100000 and market == "KOSPI":
+    elif cal_price < 100000 and market == "KOSPI":
         hogaunit = 100
-    elif upperlimit < 500000 and market == "KOSPI":
+    elif cal_price < 500000 and market == "KOSPI":
         hogaunit = 500
-    elif upperlimit >= 500000 and market == "KOSPI":
+    elif cal_price >= 500000 and market == "KOSPI":
         hogaunit = 1000
-    elif upperlimit >= 50000 and market == "KOSDAQ":
+    elif cal_price >= 50000 and market == "KOSDAQ":
         hogaunit = 100
 
-    upperlimit = int(upperlimit / hogaunit) * hogaunit + (hogaunit * diff)
+    cal_price = int(cal_price / hogaunit) * hogaunit + (hogaunit * diff)
 
-    return upperlimit
+    return cal_price
 
 # 종목별 현재가 크롤링 ******************************************
 def crawler_price(code):
@@ -1803,57 +1820,71 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 Telegram('[XTrader]CTradeShortTerm_save_history Error : %s' % e)
                 logger.error('CTradeShortTerm_save_history Error : %s' % e)
 
-    # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
-    def set_stocklist(self, data):
-        self.Stocklist = dict()
-        self.Stocklist['컬럼명'] = list(data.columns)
-        for 종목코드 in data['종목코드'].unique():
-            temp_list = data[data['종목코드'] == 종목코드].values[0]
-            self.Stocklist[종목코드] = {
-                '번호' : temp_list[self.Stocklist['컬럼명'].index('번호')],
-                '종목명': temp_list[self.Stocklist['컬럼명'].index('종목명')],
-                '종목코드': 종목코드,
-                '시장' : temp_list[self.Stocklist['컬럼명'].index('시장')],
-                '매수전략': temp_list[self.Stocklist['컬럼명'].index('매수전략')],
-                '매수가': list(int(float(temp_list[list(data.columns).index(col)].replace(',',''))) for col in data.columns if
-                                               '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
-                '매도전략': temp_list[self.Stocklist['컬럼명'].index('매도전략')],
-                '매도가': list(int(float(temp_list[list(data.columns).index(col)].replace(',',''))) for col in data.columns if
-                                               '매도가' in col and temp_list[list(data.columns).index(col)] != '')
-            }
-        return self.Stocklist
-
     # 시가 구간 확인(매수 전략 5, 3의 매수가 밴드)
-    def sprice_band_check(self, 시가, 매수가):
-        pass
+    def openprice_band_check(self, 시가, 매수가, 시가위치):
+        매수가.append(시가)
+        매수가.sort(reverse=True)
+        band = 매수가.index(시가)
+        매수가.remove(시가)
+        return band
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
         result = False
-        condition = 0
-        strategy = self.Stocklist[code]['매수전략']
-        현재가, 시가, 고가, 저가, 전일종가 = price # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
+        condition = self.Stocklist[code]['매수조건'] # 초기값 0
 
-        if strategy == '10':
-            매수가 = self.Stocklist[code]['매수가'][0]
-            시가위치하한 = 매수가 * (1 + self.Stocklist['전략']['시가위치'][0] / 100)
-            시가위치상한 = 매수가 * (1 + self.Stocklist['전략']['시가위치'][1] / 100)
+        if current_time < self.Stocklist['전략']['모니터링종료시간']:
+            strategy = self.Stocklist[code]['매수전략']
+            현재가, 시가, 고가, 저가, 전일종가 = price   # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
-            if current_time < self.Stocklist['전략']['모니터링종료시간']:
-                if 시가위치하한 <= 시가 and 시가 <= 시가위치상한 and 현재가 == 매수가:
+            if strategy == '10':
+                매수가 = self.Stocklist[code]['매수가']
+                시가위치 = self.Stocklist[code]['시가위치'][0]
+
+                if self.Stocklist[code]['시가체크'] == False: # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
+                    매수가.append(시가)
+                    매수가.sort(reverse=True)
+                    band = 매수가.index(시가)
+                    매수가.remove(시가)
+
+                    if band == len(매수가): # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
+                        return result, condition
+                    else:
+                        if band == 0:                                      # 시가가 매수가1보다 높은 경우
+                            if 매수가[band] * (1 + 시가위치 / 100) <= 시가: # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
+                                condition = 1
+                            else:                                          # 시가 위치에에미포함
+                                if len(매수가) == 1:                       # 매수가2가 미설정이므로 매수 불만족리턴
+                                    condition = 0
+                                    self.Stocklist[code]['매수조건'] = condition
+                                    return result, condition
+                                else:                                      # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
+                                    condition = 2
+                        else:                                              # 시가가 매수가1보다 낮은 경우
+                            if 매수가[band] * 1.01 <= 시가:                 # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
+                                condition = band + 1
+                            elif len(매수가) - 1 > band:                    # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
+                                condition = band + 2
+                            else:                                           # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
+                                condition = 0
+                                self.Stocklist[code]['매수조건'] = condition
+                                return result, condition
+
+                    self.Stocklist[code]['시가체크'] = True
+                    self.Stocklist[code]['매수조건'] = condition
+                else:
+                    if condition == 0:  # condition 0은 매수 조건 불만족
+                        result = False  # 매수 불만족리턴
+                        return result, condition
+
+                if 현재가 == 매수가[condition-1]: # 현재가가 설정 매수가에 도달했을 경우 매수
                     result = True
-                    condition = 1
-                elif 매수가 * 1.05 <= 시가 and 전일종가 <= 시가 and 현재가 == 전일종가:
-                    result = True
-                    condition = 2
-            else:
+
+            elif strategy == '5':
                 pass
 
-        elif strategy == '5':
-            pass
-
-        elif strategy == '3':
-            pass
+            elif strategy == '3':
+                pass
 
         return result, condition
 
@@ -1895,7 +1926,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             # 매도를 위한 수익률 구간 체크(매수가 대비 현재가의 수익률 조건에 다른 구간 설정)
             new_band = self.profit_band_check(현재가, 매수가)
-            if (upperlimitcal(시가, 0, self.portfolio[code].시장)) <= 현재가:
+            if (hogacal(시가, 0, self.portfolio[code].시장, '상한가')) <= 현재가:
                 band = 7
 
             if band < new_band: # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
@@ -1914,7 +1945,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 result = True
             elif band == 6 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[5] / 100)):
                 result = True
-            elif band == 7 and 현재가 >= (upperlimitcal(시가, -3, self.Stocklist[code]['시장'])):
+            elif band == 7 and 현재가 >= (hogacal(시가, -3, self.Stocklist[code]['시장'], '상한가')):
                 result = True
 
             self.portfolio[code].매도구간 = band # 포트폴리오에 매도구간 업데이트
@@ -1976,6 +2007,28 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             qty_ratio = 1
             return result, qty_ratio
 
+    # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
+    def set_stocklist(self, data):
+        self.Stocklist = dict()
+        self.Stocklist['컬럼명'] = list(data.columns)
+        for 종목코드 in data['종목코드'].unique():
+            temp_list = data[data['종목코드'] == 종목코드].values[0]
+            self.Stocklist[종목코드] = {
+                '번호': temp_list[self.Stocklist['컬럼명'].index('번호')],
+                '종목명': temp_list[self.Stocklist['컬럼명'].index('종목명')],
+                '종목코드': 종목코드,
+                '시장': temp_list[self.Stocklist['컬럼명'].index('시장')],
+                '투자비중': float(temp_list[self.Stocklist['컬럼명'].index('비중')]),  # 저장 후 setting 함수에서 전략의 단위투자금을 곱함
+                '시가위치': list(map(float, temp_list[self.Stocklist['컬럼명'].index('시가위치')].split(','))),
+                '매수전략': temp_list[self.Stocklist['컬럼명'].index('매수전략')],
+                '매수가': list(int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
+                    '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
+                '매도전략': temp_list[self.Stocklist['컬럼명'].index('매도전략')],
+                '매도가': list(int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
+                    '매도가' in col and temp_list[list(data.columns).index(col)] != '')
+            }
+        return self.Stocklist
+
     # 포트폴리오 생성
     def set_portfolio(self, code, condition):
         try:
@@ -2002,12 +2055,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.매도방법 = 매도방법
             self.종목리스트 = 종목리스트
 
+            self.매수총액 = 0
+
             self.Stocklist = self.set_stocklist(self.종목리스트)
             self.Stocklist['전략'] = {
                 '단위투자금': '',
                 '모니터링종료시간': '',
                 '보유일': '',
-                '시가위치': '',
+                '투자금비중': '',
                 '매도구간별조건': []
             }
 
@@ -2020,17 +2075,24 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 elif data[0] == '매수모니터링 종료시간':
                     self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
                 elif data[0] == '보유일':
-                    self.Stocklist['전략']['보유일'] = data[1]
+                    self.Stocklist['전략']['보유일'] = int(data[1])
                 elif data[0] == '손절율':
                     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
-                elif data[0] == '시가 위치':
-                    self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
+                # elif data[0] == '시가 위치':
+                #     self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
+                elif data[0] == '투자금 비중':
+                    self.Stocklist['전략']['투자금비중'] = float(data[1][:-1])
                 elif '구간' in data[0]:
                     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
 
             self.Stocklist['전략']['매도구간별조건'].insert(1, 0.3)
-            self.단위투자금 = self.Stocklist['전략']['단위투자금']
-
+            # self.단위투자금 = self.Stocklist['전략']['단위투자금']
+            for code in self.Stocklist.keys():
+                if code == '컬럼명' or code == '전략': continue
+                else:
+                    self.Stocklist[code]['단위투자금'] = int(self.Stocklist[code]['투자비중'] * self.Stocklist['전략']['단위투자금'])
+                    self.Stocklist[code]['시가체크'] = False
+                    self.Stocklist[code]['매수조건'] = 0
             print(self.Stocklist)
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
@@ -2052,6 +2114,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
             # 구간이 내려가는 건 반영하지 않으므로 초기화를 시켜서 다시 구간 체크 시작하기 위함
             self.portfolio[port_code].매도구간 = 1
+
+            # 매수총액계산
+            self.매수총액 += (self.portfolio[port_code].매수가 * self.portfolio[port_code].수량)
 
             # 포트폴리오에 있는 종목이 구글에서 받아서 만든 Stocklist에 없을 경우만 추가함
             # 이 조건이 없을 경우 구글에서 받은 전략들이 아닌 과거 전략이 포트폴리오에서 넘어감
@@ -2105,11 +2170,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 # 매수모니터링 종료 시간 확인
                 if current_time < self.Stocklist['전략']['모니터링종료시간']:
                     if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
-                        # 포트폴리오 종목 수가 최대포트 수 제한보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
-                        if len(self.portfolio) < self.최대포트수 and self.주문실행중_Lock.get('B_%s' % 종목코드) is None: # and self.portfolio.get(종목코드) is None
+                        # 매수총액 + 종목단위투자금이 투자총액보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
+                        if (self.매수총액 + self.Stocklist[종목코드]['단위투자금'] < self.투자총액) and self.주문실행중_Lock.get('B_%s' % 종목코드) is None: # and self.portfolio.get(종목코드) is None
                             # 매수 전략별 모니터링 체크
                             buy_check, condition = self.buy_strategy(종목코드, 시세)
-                            if buy_check == True and (self.단위투자금 // 현재가 > 0):
+                            if buy_check == True and (self.Stocklist[종목코드]['단위투자금'] // 현재가 > 0):
                                 (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
     
                                 if result == True:
@@ -2197,6 +2262,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.매도할종목.append(종목코드)
 
                         self.Stocklist[종목코드]['수량'] = P.수량
+                        self.매수총액 += (P.매수가 * P.수량)
 
                         self.save_history(종목코드, status='매수')
                         Slack('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
@@ -2281,35 +2347,33 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
 
-
             try:
                 Slack("[XTrader]%s ROBOT 실행" % (self.sName))
 
                 self.sAccount = sAccount
 
-                # Stocklist가 없을 경우 구글 시트 Import 부터 실행
-                self.단위투자금 = self.Stocklist['전략']['단위투자금']
-
+                self.투자총액 = floor(int(d2deposit.replace(",", "")) * (self.Stocklist['전략']['투자금비중'] / 100))
 
                 print('로봇거래계좌 : ', 로봇거래계좌번호)
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
-                print('단위투자금 : ', self.단위투자금)
-                print('로봇 수 : ', len(self.parent.robots))
+                print('투자 총액 : ', self.투자총액)
                 print('Stocklist : ', self.Stocklist)
 
-                self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
-                print(self.최대포트수)
+                # self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
+                # print(self.최대포트수)
 
                 self.주문결과 = dict()
                 self.주문번호_주문_매핑 = dict()
                 self.주문실행중_Lock = dict()
 
-                codes = list(self.Stocklist.keys())[1:-1]
+                codes = list(self.Stocklist.keys())
+                codes.remove('전략')
+                codes.remove('컬럼명')
                 self.초기조건(codes)
 
                 print("매도 : ", self.매도할종목)
                 print("매수 : ", self.매수할종목)
-
+                print("매수총액 : ", self.매수총액)
 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
@@ -3545,7 +3609,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 1. 8시 58분 이전일 경우 5분 단위 구글시트 오퓨 체크 타이머 시작시킴
         current = datetime.datetime.now()
         current_time = current.strftime('%H:%M:%S')
-        if current_time <= '08:58:00':
+        if '07:00:00' <= current_time and current_time <= '08:58:00':
             print('구글 시트 오류 체크 시작')
             Telegram('[XTrader]구글 시트 오류 체크 시작')
             self.statusbar.showMessage("구글 시트 오류 체크 시작")
@@ -4867,7 +4931,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             매수방법 = R.comboBox_buy_condition.currentText().strip()[0:2]
             매도방법 = R.comboBox_sell_condition.currentText().strip()[0:2]
             종목리스트 = R.data
-            print(종목리스트)
 
             robot.sName = 이름
             robot.Setting(sScreenNo=스크린번호, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
