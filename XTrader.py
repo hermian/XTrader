@@ -1833,58 +1833,57 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         result = False
         condition = self.Stocklist[code]['매수조건'] # 초기값 0
 
-        if current_time < self.Stocklist['전략']['모니터링종료시간']:
-            strategy = self.Stocklist[code]['매수전략']
-            현재가, 시가, 고가, 저가, 전일종가 = price   # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
+        strategy = self.Stocklist[code]['매수전략']
+        현재가, 시가, 고가, 저가, 전일종가 = price   # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
-            if strategy == '10':
-                매수가 = self.Stocklist[code]['매수가']
-                시가위치 = self.Stocklist[code]['시가위치'][0]
+        if strategy == '10':
+            매수가 = self.Stocklist[code]['매수가'] #[매수가1, 매수가2, 매수가3]
+            시가위치 = self.Stocklist[code]['시가위치'][0]
 
-                if self.Stocklist[code]['시가체크'] == False: # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
-                    매수가.append(시가)
-                    매수가.sort(reverse=True)
-                    band = 매수가.index(시가)
-                    매수가.remove(시가)
+            if self.Stocklist[code]['시가체크'] == False: # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
+                매수가.append(시가)
+                매수가.sort(reverse=True)
+                band = 매수가.index(시가)
+                매수가.remove(시가)
 
-                    if band == len(매수가): # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
-                        return result, condition
-                    else:
-                        if band == 0:                                      # 시가가 매수가1보다 높은 경우
-                            if 매수가[band] * (1 + 시가위치 / 100) <= 시가: # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
-                                condition = 1
-                            else:                                          # 시가 위치에에미포함
-                                if len(매수가) == 1:                       # 매수가2가 미설정이므로 매수 불만족리턴
-                                    condition = 0
-                                    self.Stocklist[code]['매수조건'] = condition
-                                    return result, condition
-                                else:                                      # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
-                                    condition = 2
-                        else:                                              # 시가가 매수가1보다 낮은 경우
-                            if 매수가[band] * 1.01 <= 시가:                 # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
-                                condition = band + 1
-                            elif len(매수가) - 1 > band:                    # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
-                                condition = band + 2
-                            else:                                           # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
+                if band == len(매수가): # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
+                    return result, condition
+                else:
+                    if band == 0:                                      # 시가가 매수가1보다 높은 경우
+                        if 매수가[band] * (1 + 시가위치 / 100) <= 시가: # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
+                            condition = 1
+                        else:                                          # 시가 위치에에미포함
+                            if len(매수가) == 1:                       # 매수가2가 미설정이므로 매수 불만족리턴
                                 condition = 0
                                 self.Stocklist[code]['매수조건'] = condition
                                 return result, condition
+                            else:                                      # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
+                                condition = 2
+                    else:                                              # 시가가 매수가1보다 낮은 경우
+                        if 매수가[band] * 1.01 <= 시가:                 # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
+                            condition = band + 1
+                        elif len(매수가) - 1 > band:                    # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
+                            condition = band + 2
+                        else:                                           # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
+                            condition = 0
+                            self.Stocklist[code]['매수조건'] = condition
+                            return result, condition
 
-                    self.Stocklist[code]['시가체크'] = True
-                    self.Stocklist[code]['매수조건'] = condition
-                else:
-                    if condition == 0:  # condition 0은 매수 조건 불만족
-                        result = False  # 매수 불만족리턴
-                        return result, condition
+                self.Stocklist[code]['시가체크'] = True
+                self.Stocklist[code]['매수조건'] = condition
+            else:                   # 시가 위치 체크를 한 두번째 데이터 이후에는 condition이 0이면 바로 매수 불만족리턴시킴
+                if condition == 0:  # condition 0은 매수 조건 불만족
+                    result = False  # 매수 불만족리턴
+                    return result, condition
 
-                if 현재가 == 매수가[condition-1]: # 현재가가 설정 매수가에 도달했을 경우 매수
-                    result = True
+            if 현재가 == 매수가[condition-1]: # 현재가가 설정 매수가에 도달했을 경우 매수
+                result = True
 
-            elif strategy == '5':
-                pass
+        elif strategy == '5':
+            pass
 
-            elif strategy == '3':
-                pass
+        elif strategy == '3':
+            pass
 
         return result, condition
 
@@ -1931,7 +1930,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             if band < new_band: # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
                 band = new_band # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
-
 
             if band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
                 result = True
@@ -2030,16 +2028,16 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         return self.Stocklist
 
     # 포트폴리오 생성
-    def set_portfolio(self, code, condition):
+    def set_portfolio(self, code, buyprice, condition):
         try:
             self.portfolio[code] = CPortStock_ShortTerm(번호=self.Stocklist[code]['번호'], 종목코드=code, 종목명=self.Stocklist[code]['종목명'], 시장=self.Stocklist[code]['시장'],
-                                              매수전략=self.Stocklist[code]['매수전략'], 매수가=self.Stocklist[code]['매수가'][0],
+                                              매수전략=self.Stocklist[code]['매수전략'], 매수가=buyprice,
                                               매수조건=condition, 보유일=self.Stocklist['전략']['보유일'],
                                               매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
                                               매도구간별조건=self.Stocklist['전략']['매도구간별조건'],
                                               매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
 
-            self.Stocklist[code]['매수일'] = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+            self.Stocklist[code]['매수일'] = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S') # 매매이력 업데이트를 위해 매수일 추가
 
         except Exception as e:
             print('CTradeShortTerm_set_portfolio Error ', e)
@@ -2076,12 +2074,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
                 elif data[0] == '보유일':
                     self.Stocklist['전략']['보유일'] = int(data[1])
+                elif data[0] == '투자금 비중':
+                    self.Stocklist['전략']['투자금비중'] = float(data[1][:-1])
                 elif data[0] == '손절율':
                     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
                 # elif data[0] == '시가 위치':
                 #     self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
-                elif data[0] == '투자금 비중':
-                    self.Stocklist['전략']['투자금비중'] = float(data[1][:-1])
                 elif '구간' in data[0]:
                     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
 
@@ -2101,6 +2099,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
     def 초기조건(self, codes):
+        # 매수총액 계산하기
+        # 금일매도종목 리스트 변수 초기화
+        # 매도할종목 : 포트폴리오에 있던 종목 추가
+        # 매수할종목 : 구글에서 받은 종목 추가
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
 
         self.금일매도종목 = [] # 장 마감 후 금일 매도한 종목에 대해서 매매이력 정리 업데이트(매도가, 손익률 등)
@@ -2113,13 +2115,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         for port_code in list(self.portfolio.keys()): # 포트폴리오에 있는 종목은 '매도할종목'에 추가
             # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
             # 구간이 내려가는 건 반영하지 않으므로 초기화를 시켜서 다시 구간 체크 시작하기 위함
-            self.portfolio[port_code].매도구간 = 1
+            self.portfolio[port_code].매도구간 = 1 # 매도 구간은 로봇 실행 시 마다 초기화시킴
 
             # 매수총액계산
             self.매수총액 += (self.portfolio[port_code].매수가 * self.portfolio[port_code].수량)
 
             # 포트폴리오에 있는 종목이 구글에서 받아서 만든 Stocklist에 없을 경우만 추가함
             # 이 조건이 없을 경우 구글에서 받은 전략들이 아닌 과거 전략이 포트폴리오에서 넘어감
+            # 근데 포트폴리오에 있는 종목을 왜 Stocklist에 넣어야되는지 모르겠음(내가 하고도...)
             if port_code not in list(self.Stocklist.keys()):
                 self.Stocklist[port_code] = {
                     '번호': self.portfolio[port_code].번호,
@@ -2175,11 +2178,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                             # 매수 전략별 모니터링 체크
                             buy_check, condition = self.buy_strategy(종목코드, 시세)
                             if buy_check == True and (self.Stocklist[종목코드]['단위투자금'] // 현재가 > 0):
-                                (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
+                                (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.Stocklist[종목코드]['단위투자금'])
     
                                 if result == True:
                                     if self.portfolio.get(종목코드) is None:     # 포트폴리오에 없으면 신규 저장
-                                        self.set_portfolio(종목코드, condition)
+                                        self.set_portfolio(종목코드, 현재가, condition)
 
                                     self.주문실행중_Lock['B_%s' % 종목코드] = True
                                     Slack('[XTrader]정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
@@ -2195,7 +2198,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     if self.portfolio.get(종목코드) is not None and self.주문실행중_Lock.get('S_%s' % 종목코드) is None:# and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
                         # 매도 전략별 모니터링 체크
                         sell_check, ratio = self.sell_strategy(종목코드, 시세)
-                        if (sell_check == True):
+                        if sell_check == True:
                             (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가,
                                                         수량=int(self.portfolio[종목코드].수량*ratio))
 
@@ -2295,18 +2298,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         Slack('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
-                    Telegram('[XTrader]체결처리_매도 매매이력 Error : %s' % e)
-                    logger.error('체결처리_매도 매매이력 Error : %s' % e)
-
-                try:
-                    P = self.portfolio.get(종목코드)
-                    if P is not None:
-                        if P.수량 == 0:
-                            self.portfolio.pop(종목코드)
-                            logger.info('체결처리_매도 포트폴리오POP %s ' % 종목코드)
-                except Exception as e:
-                    Telegram('[XTrader]체결처리_매도 POP에러 종목명:%s' % param['종목명'])
-                    logger.error('체결처리_매도 POP에러 종목명:%s' % param['종목명'])
+                    Telegram('[XTrader]체결처리_매도 Error : %s' % e)
+                    logger.error('체결처리_매도 Error : %s' % e)
 
         # 메인 화면에 반영
         self.parent.RobotView()
@@ -2832,6 +2825,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         for data in row_data:
             if data[0] == '단위투자금':
                 self.Stocklist['전략']['단위투자금'] = int(data[1])
+            elif data[0] == '투자금 비중':
+                self.투자금비중 = 100 - float(data[1][:-1])
             elif data[0] == '손절율':
                 self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
             elif '구간' in data[0]:
@@ -3043,10 +3038,13 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 codes = self.종목리스트['종목코드'].values
                 self.초기조건(codes)
 
+                self.투자총액 = floor(int(d2deposit.replace(",", "")) * (self.투자금비중 / 100))
+
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
+                print('투자금 : ', self.투자총액)
                 print('단위투자금 : ', self.단위투자금)
 
-                self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
+                self.최대포트수 = floor(self.투자총액 / self.단위투자금)
                 print(self.최대포트수)
 
                 print("매도 : ", self.매도할종목)
