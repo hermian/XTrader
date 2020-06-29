@@ -2392,7 +2392,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             Slack("[XTrader]%s ROBOT 실행 중지" % (self.sName))
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
             self.f.close()
-
+            del self.f
+            del self.wr
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
                     if self.portfolio[code].수량 == 0:
