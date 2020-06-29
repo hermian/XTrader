@@ -45,6 +45,7 @@ import telepot # 텔레그램봇(추가 설치 모듈)
 
 from slacker import Slacker # 슬랙봇(추가 설치 모듈)
 
+import csv
 
 # Google Spreadsheet Setting *******************************
 scope = ['https://spreadsheets.google.com/feeds',
@@ -2168,6 +2169,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
                 self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
+                self.wr.writerow([체결시간, 종목코드, 종목명, 현재가, 전일대비])
 
                 # 매수 조건
                 # 매수모니터링 종료 시간 확인
@@ -2373,6 +2375,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
                 self.KiwoomConnect()  # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
                 if len(self.실시간종목리스트) > 0:
+                    self.f = open('data_result.csv', 'a', newline='')
+                    self.wr = csv.writer(self.f)
+                    self.wr.writerow(['체결시간', '종목코드', '종목명', '현재가', '전일대비'])
+
+
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
                     logger.debug("실시간데이타요청 등록결과 %s" % ret)
         
@@ -2384,6 +2391,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         else:
             Slack("[XTrader]%s ROBOT 실행 중지" % (self.sName))
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
+            self.f.close()
 
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
