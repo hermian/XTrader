@@ -1882,7 +1882,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # 매수 조건 2일 경우는 매수가1 도달 시, 매수 조건 3일 경우는 매수가2 도달 시 매수상한도달을 True로 함
             if condition == 1 and 현재가 > 매수가[condition-1] * (1 + 시가위치상한 / 100):
                 self.Stocklist[code]['매수상한도달'] = True
-            elif condition != 1 and 현재가 > 매수가[condition-1]:
+            elif condition != 1 and 현재가 > 매수가[condition-2]:
                 self.Stocklist[code]['매수상한도달'] = True
 
             # 매수상한에 미도달한 상태로 매수가로 내려왔을 때 매수
