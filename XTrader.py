@@ -1832,61 +1832,65 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
         result = False
-        condition = self.Stocklist[code]['매수조건'] # 초기값 0
+        condition = self.Stocklist[code]['매수조건']  # 초기값 0
 
         strategy = self.Stocklist[code]['매수전략']
-        현재가, 시가, 고가, 저가, 전일종가 = price   # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
+        현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
         if strategy == '10':
-            매수가 = self.Stocklist[code]['매수가'] #[매수가1, 매수가2, 매수가3]
+            매수가 = self.Stocklist[code]['매수가']  # [매수가1, 매수가2, 매수가3]
             시가위치하한 = self.Stocklist[code]['시가위치'][0]
             시가위치상한 = self.Stocklist[code]['시가위치'][1]
 
-            if self.Stocklist[code]['시가체크'] == False: # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
+            if self.Stocklist[code]['시가체크'] == False:  # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
                 매수가.append(시가)
                 매수가.sort(reverse=True)
                 band = 매수가.index(시가)
                 매수가.remove(시가)
 
-                if band == len(매수가): # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
+                if band == len(매수가):  # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
                     return result, condition
                 else:
-                    if band == 0:                                      # 시가가 매수가1보다 높은 경우
-                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가 and 시가 <= 매수가[band] * (1 + 시가위치상한 / 100): # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
+                    if band == 0:  # 시가가 매수가1보다 높은 경우
+                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가 and 시가 <= 매수가[band] * (
+                                1 + 시가위치상한 / 100):  # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
                             condition = 1
-                        else:                                          # 시가 위치에에미포함
-                            if len(매수가) == 1:                       # 매수가2가 미설정이므로 매수 불만족리턴
+                        else:  # 시가 위치에에미포함
+                            if len(매수가) == 1:  # 매수가2가 미설정이므로 매수 불만족리턴
                                 condition = 0
                                 self.Stocklist[code]['매수조건'] = condition
                                 return result, condition
-                            else:                                      # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
+                            else:  # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
                                 condition = 2
-                    else:                                              # 시가가 매수가1보다 낮은 경우
-                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가: # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
+                    else:  # 시가가 매수가1보다 낮은 경우
+                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가:  # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
                             condition = band + 1
-                        elif len(매수가) - 1 > band:                    # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
+                        elif len(매수가) - 1 > band:  # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
                             condition = band + 2
-                        else:                                           # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
+                        else:  # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
                             condition = 0
                             self.Stocklist[code]['매수조건'] = condition
                             return result, condition
 
                 self.Stocklist[code]['시가체크'] = True
                 self.Stocklist[code]['매수조건'] = condition
-            else:                   # 시가 위치 체크를 한 두번째 데이터 이후에는 condition이 0이면 바로 매수 불만족리턴시킴
+            else:  # 시가 위치 체크를 한 두번째 데이터 이후에는 condition이 0이면 바로 매수 불만족리턴시킴
                 if condition == 0:  # condition 0은 매수 조건 불만족
                     result = False  # 매수 불만족리턴
                     return result, condition
 
             # 매수 조건 1일 경우 시가위치 상한 이상으로 오르면 매수상한도달을 True로 해서 매수하지 않게 함
             # 매수 조건 2일 경우는 매수가1 도달 시, 매수 조건 3일 경우는 매수가2 도달 시 매수상한도달을 True로 함
-            if condition == 1 and 현재가 > 매수가[condition-1] * (1 + 시가위치상한 / 100):
-                self.Stocklist[code]['매수상한도달'] = True
-            elif condition != 1 and 현재가 > 매수가[condition-2]:
+            # 20.07.02 변경 : 상한 제한은 시가위치상한값으로 통일함
+            # if condition == 1 and 현재가 > 매수가[condition-1] * (1 + 시가위치상한 / 100):
+            #     self.Stocklist[code]['매수상한도달'] = True
+            # elif condition != 1 and 현재가 > 매수가[condition-2]:
+            #     self.Stocklist[code]['매수상한도달'] = True
+            if 현재가 > 매수가[condition - 1] * (1 + 시가위치상한 / 100):
                 self.Stocklist[code]['매수상한도달'] = True
 
             # 매수상한에 미도달한 상태로 매수가로 내려왔을 때 매수
-            if self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[condition-1]: # 현재가가 설정 매수가에 도달했을 경우 매수
+            if self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[condition - 1]:  # 현재가가 설정 매수가에 도달했을 경우 매수
                 result = True
 
         elif strategy == '5':
@@ -1895,6 +1899,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         elif strategy == '3':
             pass
 
+        # 매수 상한에 도달한 종목은 매수 모니터링 중지를 위해 매수할종목리스트에서 삭제
+        if self.Stocklist[code]['매수상한도달'] == True: self.매수할종목.remove(code)
         return result, condition
 
     # 매도 구간 확인
