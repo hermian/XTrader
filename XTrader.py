@@ -70,8 +70,8 @@ stock_sheet = doc.worksheet('종목선정') # Sheet
 shortterm_history_sheet = doc.worksheet('매매이력')
 condition_history_sheet = doc_test.worksheet('조건식이력')
 
-shortterm_history_cols = ['번호', '종목명', '매수가', '매수일', '매수전략', '매수조건', '매도가', '매도일', '매도전략', '매도구간',
-                '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
+shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
+                          '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
 condition_history_cols = ['종목명', '매수가', '매수일','매도가', '매도일',
                         '수익률(계산)', '수익률', '수익금', '세금+수수료', '확정 수익금']
 
@@ -1776,6 +1776,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
 
+                cell = alpha_list[shortterm_history_cols.index('매도수량')] + str(code_row)
+                shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도수량'])
+
                 cell = alpha_list[shortterm_history_cols.index('매도일')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
 
@@ -1790,6 +1793,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if status == '매수': # 포트폴리오 데이터 사용
                     cell = alpha_list[shortterm_history_cols.index('매수가')] + str(code_row)
                     shortterm_history_sheet.update_acell(cell, self.portfolio[code].매수가)
+
+                    cell = alpha_list[shortterm_history_cols.index('매수수량')] + str(code_row)
+                    shortterm_history_sheet.update_acell(cell, self.portfolio[code].수량)
 
                     cell = alpha_list[shortterm_history_cols.index('매수일')] + str(code_row)
                     shortterm_history_sheet.update_acell(cell, self.portfolio[code].매수일)
@@ -1810,6 +1816,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     row.append(self.portfolio[code].번호)
                     row.append(self.portfolio[code].종목명)
                     row.append(self.portfolio[code].매수가)
+                    row.append(self.portfolio[code].수량)
                     row.append(self.portfolio[code].매수일)
                     row.append(self.portfolio[code].매수전략)
                     row.append(self.portfolio[code].매수조건)
@@ -2310,7 +2317,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                         self.Stocklist[종목코드]['매도체결가'] = 체결가
                         self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
-
+                        self.Stocklist[종목코드]['매도수량'] = 주문수량
                         self.save_history(종목코드, status='매도')
 
                         Slack('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
