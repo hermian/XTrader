@@ -3946,6 +3946,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if '17:00:00' <= current_time and current_time < '17:00:05':
             if self.DailyData == False:
                 self.DailyData = True
+                self.WeeklyData = False
+                self.MonthlyData = False
                 self.InvestorData = False
                 Slack("[XTrader]관심종목 데이터 업데이트")
                 self.stock_analysis()
