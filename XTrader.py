@@ -2073,9 +2073,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             row_data = strategy_sheet.get_all_values()
 
             for data in row_data:
-                if data[0] == '단위투자금':
-                    self.Stocklist['전략']['단위투자금'] = int(data[1])
-                elif data[0] == '매수모니터링 종료시간':
+                # if data[0] == '단위투자금':
+                #     self.Stocklist['전략']['단위투자금'] = int(data[1])
+                if data[0] == '매수모니터링 종료시간':
                     self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
                 # elif data[0] == '보유일':
                 #     self.Stocklist['전략']['보유일'] = int(data[1])
