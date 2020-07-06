@@ -2230,32 +2230,21 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                                                                                    현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
 
                 # 보유일 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
-                if current_time == '15:29:00':
+                if current_time >= '15:29:00' and current_time < '15:30:00':
                     for code in list(self.portfolio.keys()):
-                        보유기간 = holdingcal(self.portfolio[종목코드].매수일)
-                        if 보유기간 == int(self.portfolio[종목코드].보유일):
-                            self.portfolio[종목코드].매도구간 = 0
-                            (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가,
-                                                        수량=self.portfolio[종목코드].수량)
+                        보유기간 = holdingcal(self.portfolio[code].매수일)
+                        if 보유기간 >= int(self.portfolio[code].보유일):
+                            self.portfolio[code].매도구간 = 0
+                            (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=현재가,
+                                                        수량=self.portfolio[code].수량)
 
                             if result == True:
-                                self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
-                                                                                                   self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량))
-                                logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
-                                                                                                self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량 ))
+                                self.주문실행중_Lock['S_%s' % code] = True
+                                Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                                logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
                             else:
-                                Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                        현재가,
-                                                                                                        self.portfolio[
-                                                                                                            종목코드].매도구간,
-                                                                                                        self.portfolio[
-                                                                                                            종목코드].수량 * ratio))
-                                logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                  현재가, self.portfolio[
-                                                                                                      종목코드].매도구간,
-                                                                                                  self.portfolio[
-                                                                                                      종목코드].수량 * ratio))
+                                Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명,self.portfolio[code].수량))
+                                logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명,self.portfolio[code].수량))
 
         except Exception as e:
             print('CTradeShortTerm_실시간데이타처리 Error ', e)
