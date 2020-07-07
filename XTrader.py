@@ -155,7 +155,7 @@ def import_googlesheet():
 
         # 사전 데이터 정리
         data = data[(data['매수모니터링'] == '1') & (data['종목코드']!= '')]
-        data =  data[row_data[0][:row_data[0].index('매도가')+1]]
+        data = data[row_data[0][:row_data[0].index('매도가')+1]]
         del data['매수모니터링']
 
         data.to_csv('%s_googlesheetdata.csv'%(datetime.date.today().strftime('%Y%m%d')), encoding='euc-kr', index=False)
@@ -341,23 +341,6 @@ class CPortStock_ShortTerm(object):
             self.목표도달 = False # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
             self.매도조건 = '' # 구간매도 : B, 목표매도 : T
 
-    def 평균단가(self):
-        if self.이전매수단위수 > 0:
-            return ((self.매수가 * self.수량) + (self.이전매수가 * self.이전수량)) // (self.수량 + self.이전수량)
-        else:
-            return self.매수가
-
-    def manual_function(self, code):
-
-        data = {'009310':690,
-                '054620':690,
-                '064820':690,
-                '226330':650,
-                '226360':690,
-                '267270':640}
-
-        self.매수비용 = data[code]
-
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
     def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
@@ -392,7 +375,7 @@ class CTrade(object):
 
         self.running = False  # 실행상태
 
-        self.portfolio= dict()  # 포트폴리오 관리 {'종목코드':종목정보}
+        self.portfolio = dict()  # 포트폴리오 관리 {'종목코드':종목정보}
         self.현재가 = dict()  # 각 종목의 현재가
 
     """
@@ -2134,8 +2117,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             if port_code not in list(self.Stocklist.keys()):
                 self.Stocklist[port_code] = {
                     '번호': self.portfolio[port_code].번호,
-                    '종목명':self.portfolio[port_code].종목명,
-                    '종목코드':self.portfolio[port_code].종목코드,
+                    '종목명': self.portfolio[port_code].종목명,
+                    '종목코드': self.portfolio[port_code].종목코드,
                     '시장': self.portfolio[port_code].시장,
                     '매수전략': self.portfolio[port_code].매수전략,
                     '매수가': self.portfolio[port_code].매수가,
@@ -2233,19 +2216,22 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if current_time >= '15:29:00' and current_time < '15:30:00':
                     for code in list(self.portfolio.keys()):
                         보유기간 = holdingcal(self.portfolio[code].매수일)
-                        if 보유기간 >= int(self.portfolio[code].보유일):
+                        if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code):
                             self.portfolio[code].매도구간 = 0
                             (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=현재가,
                                                         수량=self.portfolio[code].수량)
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % code] = True
-                                Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                                logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                                Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                                logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
                             else:
-                                Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명,self.portfolio[code].수량))
-                                logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명,self.portfolio[code].수량))
-
+                                Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                                logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
         except Exception as e:
             print('CTradeShortTerm_실시간데이타처리 Error ', e)
             Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 : %s' % e)
@@ -2341,7 +2327,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             if P.수량 == 0:
                 self.portfolio.pop(종목코드)
                 self.매도할종목.remove(종목코드)
-                if 종목코드 not in self.금일매도종목 : self.금일매도종목.append(종목코드)
+                if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
                 logger.info('잔고처리_포트폴리오POP %s ' % 종목코드)
 
         # 메인 화면에 반영
@@ -3371,8 +3357,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.df_daily = DataFrame()
         self.df_weekly = DataFrame()
         self.df_monthly = DataFrame()
-        self.df_investor = DataFrame()
-
+        self.df_investor = DataFrame()                           
         self._login = False
 
         self.KiwoomLogin()  # 프로그램 실행 시 자동로그인
@@ -3409,6 +3394,259 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionTradeShortTerm.setIcon(QIcon('./PNG/Bullish.png'))
         self.actionTradeCondition.setIcon(QIcon('./PNG/Search.png'))
         self.actionConditionMonitoring.setIcon(QIcon('./PNG/Binoculars.png'))
+
+        # 종목 선정
+        def stock_analysis(self):
+            try:
+                self.AnalysisPriceList = self.AnalysisPriceList
+            except:
+                for robot in self.robots:
+                    if robot.sName == 'TradeShortTerm':
+                        self.AnalysisPriceList = robot.Stocklist['전략']['시세조회단위']
+
+            self.종목선정데이터 = pd.DataFrame(shortterm_analysis_sheet.get_all_records())  # shortterm_analysis_sheet
+            self.종목선정데이터 = self.종목선정데이터[['번호', '종목명']]
+            row = []
+            # print(self.종목선정데이터)
+            for name in self.종목선정데이터['종목명'].values:
+                try:
+                    code, name, market = get_code(name)
+                except Exception as e:
+                    code = ''
+                    print('get_code Error :', name, e)
+                row.append(code)
+
+            self.종목선정데이터['종목코드'] = row
+            self.종목선정데이터 = self.종목선정데이터[self.종목선정데이터['종목코드'] != '']
+            print(self.종목선정데이터)
+            self.종목리스트 = list(self.종목선정데이터[['번호', '종목명', '종목코드']].values)
+            self.종목코드 = self.종목리스트.pop(0)
+
+            if self.DailyData == True:
+                self.start = datetime.datetime.now()
+                print(self.start)
+                self.ReguestPriceDaily()
+            elif self.InvestorData == True:
+                self.RequestInvestorDaily()
+            elif self.WeeklyData == True:
+                self.ReguestPriceWeekly()
+            elif self.MonthlyData == True:
+                self.ReguestPriceMonthly()
+
+        def ReguestPriceDaily(self, _repeat=0):
+            try:
+                기준일자 = datetime.date.today().strftime('%Y%m%d')
+                self.종목일봉 = []
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
+                ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식일봉차트조회", "OPT10081",
+                                              _repeat,
+                                              '{:04d}'.format(self.ScreenNumber))
+
+                self.statusbar.showMessage("관심종목 일봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
+
+            except Exception as e:
+                print(e)
+
+        def ReguestPriceWeekly(self, _repeat=0):
+            try:
+                기준일자 = datetime.date.today().strftime('%Y%m%d')
+                self.종목주봉 = []
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
+                ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식주봉차트조회", "OPT10082",
+                                              _repeat,
+                                              '{:04d}'.format(self.ScreenNumber))
+
+                self.statusbar.showMessage("관심종목 주봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
+
+            except Exception as e:
+                print(e)
+
+        def ReguestPriceMonthly(self, _repeat=0):
+            try:
+                기준일자 = datetime.date.today().strftime('%Y%m%d')
+                self.종목월봉 = []
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
+                ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식월봉차트조회", "OPT10083",
+                                              _repeat,
+                                              '{:04d}'.format(self.ScreenNumber))
+
+                self.statusbar.showMessage("관심종목 월봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
+
+            except Exception as e:
+                print(e)
+
+        def RequestInvestorDaily(self, _repeat=0):
+            기준일자 = datetime.date.today().strftime('%Y%m%d')
+            self.종목별투자자 = []
+
+            try:
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "일자", 기준일자)
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "금액수량구분", 2)  # 1:금액, 2:수량
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "매매구분", 0)  # 0:순매수, 1:매수, 2:매도
+                ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "단위구분", 1)  # 1000:천주, 1:단주
+                ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "종목별투자자조회", "OPT10060",
+                                              _repeat,
+                                              '{:04d}'.format(self.ScreenNumber))
+
+                self.statusbar.showMessage("관심종목 종목별투자자 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
+            except Exception as e:
+                print(e)
+
+        def UploadAnalysisData(self, data, 구분):
+            # shortterm_analysis_sheet = test_analysis_sheet
+            row = []
+            if 구분 == '일봉':
+                try:
+                    data['일봉1'] = data['현재가'].rolling(window=self.AnalysisPriceList[0]).mean()
+                    data['일봉2'] = data['현재가'].rolling(window=self.AnalysisPriceList[1]).mean()
+                    data['일봉3'] = data['현재가'].rolling(window=self.AnalysisPriceList[2]).mean()
+                    data['일봉4'] = data['현재가'].rolling(window=self.AnalysisPriceList[3]).mean()
+
+                    result = data.iloc[-1].values
+                    # 구글 업로드
+                    # row.append(self.종목코드[0])
+                    # row.append(str(round((result[3] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # row.append(str(round((result[4] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # row.append(str(round((result[5] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # row.append(str(round((result[6] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # row.append(str(round((int(data.iloc[-2]['거래량']) / int(data.iloc[-1]['거래량']) - 1) * 100, 2)) + '%')
+                    # print(row)
+                    #
+                    # code_row = shortterm_analysis_sheet.findall(row[0])[-1].row
+                    #
+                    # cell = alpha_list[shortterm_analysis_cols.index('일봉1')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[1])
+                    # cell = alpha_list[shortterm_analysis_cols.index('일봉2')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[2])
+                    # cell = alpha_list[shortterm_analysis_cols.index('일봉3')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[3])
+                    # cell = alpha_list[shortterm_analysis_cols.index('일봉4')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[4])
+                    # cell = alpha_list[shortterm_analysis_cols.index('거래량')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[5])
+
+                    # DB 저장
+                    dict = {'번호': [],
+                            '종목명': [],
+                            '종목코드': [],
+                            '일봉1': [],
+                            '일봉2': [],
+                            '일봉3': [],
+                            '일봉4': [],
+                            '거래량': []}
+                    dict['번호'].append(str(self.종목코드[0]))
+                    dict['종목명'].append(self.종목코드[1])
+                    dict['종목코드'].append(self.종목코드[2])
+                    dict['일봉1'].append(str(round((result[3] / int(result[1]) - 1) * 100, 2)) + '%')
+                    dict['일봉2'].append(str(round((result[4] / int(result[1]) - 1) * 100, 2)) + '%')
+                    dict['일봉3'].append(str(round((result[5] / int(result[1]) - 1) * 100, 2)) + '%')
+                    dict['일봉4'].append(str(round((result[6] / int(result[1]) - 1) * 100, 2)) + '%')
+                    dict['거래량'].append(
+                        str(round((int(data.iloc[-2]['거래량']) / int(data.iloc[-1]['거래량']) - 1) * 100, 2)) + '%')
+
+                    temp = DataFrame(dict)
+                    self.df_daily = pd.concat([self.df_daily, temp])
+
+                except Exception as e:
+                    print('UploadDailyPriceData Error : ', e)
+
+            elif 구분 == '주봉':
+                try:
+                    data['주봉1'] = data['현재가'].rolling(window=self.AnalysisPriceList[4]).mean()
+
+                    result = data.iloc[-1].values
+
+                    # 구글 업로드
+                    # row.append(self.종목코드[0])
+                    # row.append(str(round((result[2] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # print(row)
+                    #
+                    # code_row = shortterm_analysis_sheet.findall(row[0])[-1].row
+                    #
+                    # cell = alpha_list[shortterm_analysis_cols.index('주봉1')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[1])
+
+                    # DB 저장
+                    dict = {'종목코드': [],
+                            '주봉1': []
+                            }
+                    dict['종목코드'].append(self.종목코드[2])
+                    dict['주봉1'].append(str(round((result[2] / int(result[1]) - 1) * 100, 2)) + '%')
+                    temp = DataFrame(dict)
+                    self.df_weekly = pd.concat([self.df_weekly, temp])
+
+                except Exception as e:
+                    print('UploadWeeklyPriceData Error : ', e)
+
+            elif 구분 == '월봉':
+                try:
+                    data['월봉1'] = data['현재가'].rolling(window=self.AnalysisPriceList[5]).mean()
+
+                    result = data.iloc[-1].values
+
+                    # 구글 업로드
+                    # row.append(self.종목코드[0])
+                    # row.append(str(round((result[2] / int(result[1]) - 1) * 100, 2)) + '%')
+                    # print(row)
+                    #
+                    # code_row = shortterm_analysis_sheet.findall(row[0])[-1].row
+                    #
+                    # cell = alpha_list[shortterm_analysis_cols.index('월봉1')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[1])
+
+                    # DB 저장
+                    dict = {'종목코드': [],
+                            '월봉1': []
+                            }
+                    dict['종목코드'].append(self.종목코드[2])
+                    dict['월봉1'].append(str(round((result[2] / int(result[1]) - 1) * 100, 2)) + '%')
+                    temp = DataFrame(dict)
+                    self.df_monthly = pd.concat([self.df_monthly, temp])
+
+                except Exception as e:
+                    print('UploadmonthlyPriceData Error : ', e)
+
+            elif 구분 == '종목별투자자':
+                try:
+                    result = data.iloc[-1].values
+
+                    # 구글 업로드
+                    # row.append(self.종목코드[0])
+                    # row.append(result[1])  # 기관
+                    # row.append(result[2])  # 외국인
+                    # row.append(result[3])  # 개인
+                    # print(row)
+                    #
+                    # code_row = shortterm_analysis_sheet.findall(row[0])[-1].row
+                    #
+                    # cell = alpha_list[shortterm_analysis_cols.index('기관수급')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[1])
+                    # cell = alpha_list[shortterm_analysis_cols.index('외인수급')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[2])
+                    # cell = alpha_list[shortterm_analysis_cols.index('개인')] + str(code_row)
+                    # shortterm_analysis_sheet.update_acell(cell, row[3])
+
+                    # DB 저장
+                    dict = {'종목코드': [],
+                            '기관': [],
+                            '외인': [],
+                            '개인': []}
+                    dict['종목코드'].append(self.종목코드[2])
+                    dict['기관'].append(result[1])  # 기관
+                    dict['외인'].append(result[2])  # 외국인
+                    dict['개인'].append(result[3])  # 개인
+                    temp = DataFrame(dict)
+                    self.df_investor = pd.concat([self.df_investor, temp])
+
+                except Exception as e:
+                    print('UploadDailyInvestorData Error : ', e)
 
     # 종목 선정
     def stock_analysis(self):
@@ -3448,6 +3686,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif self.MonthlyData == True:
             self.ReguestPriceMonthly()
 
+    # 일봉데이터조희
     def ReguestPriceDaily(self, _repeat=0):
         try:
             기준일자 = datetime.date.today().strftime('%Y%m%d')
@@ -3455,7 +3694,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
-            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식일봉차트조회", "OPT10081", _repeat,
+            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식일봉차트조회", "OPT10081",
+                                          _repeat,
                                           '{:04d}'.format(self.ScreenNumber))
 
             self.statusbar.showMessage("관심종목 일봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
@@ -3463,6 +3703,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(e)
 
+    # 주봉데이터조회
     def ReguestPriceWeekly(self, _repeat=0):
         try:
             기준일자 = datetime.date.today().strftime('%Y%m%d')
@@ -3470,7 +3711,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
-            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식주봉차트조회", "OPT10082", _repeat,
+            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식주봉차트조회", "OPT10082",
+                                          _repeat,
                                           '{:04d}'.format(self.ScreenNumber))
 
             self.statusbar.showMessage("관심종목 주봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
@@ -3478,6 +3720,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(e)
 
+    # 월봉데이터조회
     def ReguestPriceMonthly(self, _repeat=0):
         try:
             기준일자 = datetime.date.today().strftime('%Y%m%d')
@@ -3485,7 +3728,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "종목코드", self.종목코드[2])
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "기준일자", 기준일자)
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, Qstring)', "수정주가구분", '1')
-            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식월봉차트조회", "OPT10083", _repeat,
+            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "주식월봉차트조회", "OPT10083",
+                                          _repeat,
                                           '{:04d}'.format(self.ScreenNumber))
 
             self.statusbar.showMessage("관심종목 월봉 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
@@ -3493,6 +3737,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print(e)
 
+    # 종목별투자자조희
     def RequestInvestorDaily(self, _repeat=0):
         기준일자 = datetime.date.today().strftime('%Y%m%d')
         self.종목별투자자 = []
@@ -3503,13 +3748,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "금액수량구분", 2)  # 1:금액, 2:수량
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "매매구분", 0)  # 0:순매수, 1:매수, 2:매도
             ret = self.kiwoom.dynamicCall('SetInputValue(Qstring, int)', "단위구분", 1)  # 1000:천주, 1:단주
-            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "종목별투자자조회", "OPT10060", _repeat,
+            ret = self.kiwoom.dynamicCall('CommRqData(QString, QString, int, QString)', "종목별투자자조회", "OPT10060",
+                                          _repeat,
                                           '{:04d}'.format(self.ScreenNumber))
 
             self.statusbar.showMessage("관심종목 종목별투자자 데이터 : %s %s %s" % (self.종목코드[0], self.종목코드[1], self.종목코드[2]))
         except Exception as e:
             print(e)
 
+    # DB 데이터 저장
     def UploadAnalysisData(self, data, 구분):
         # shortterm_analysis_sheet = test_analysis_sheet
         row = []
@@ -3991,13 +4238,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
 
         # 16시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
-        if '17:00:00' <= current_time and current_time < '17:00:05':
+        if '18:10:00' <= current_time and current_time < '18:10:05':
             if self.DailyData == False:
                 self.DailyData = True
                 self.WeeklyData = False
                 self.MonthlyData = False
                 self.InvestorData = False
-                Slack("[XTrader]관심종목 데이터 업데이트")
+                Telegram("[XTrader]관심종목 데이터 업데이트")
                 self.stock_analysis()
 
         # if '153600' < current_time and current_time < '153659' and self.금일백업작업중 == False and self._login == True:# and current.weekday() == 4:
@@ -4481,7 +4728,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     pass
 
                 df = df.sort_values(by='일자').reset_index(drop=True)
-                df.to_csv('data.csv')
+                # df.to_csv('data.csv')
 
                 self.UploadAnalysisData(data=df, 구분='주봉')
 
@@ -4524,7 +4771,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     pass
 
                 df = df.sort_values(by='일자').reset_index(drop=True)
-                df.to_csv('data.csv')
+                #df.to_csv('data.csv')
 
                 self.UploadAnalysisData(data=df, 구분='월봉')
 
@@ -4567,7 +4814,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     pass
                 # df.dropna(inplace=True)
                 df = df.sort_values(by='일자').reset_index(drop=True)
-                df.to_csv('종목별투자자.csv', encoding='euc-kr')
+                #df.to_csv('종목별투자자.csv', encoding='euc-kr')
 
                 self.UploadAnalysisData(data=df, 구분='종목별투자자')
 
@@ -4580,7 +4827,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     print('start :', self.start)
                     print('end :', self.end)
                     print('소요시간 :', self.end - self.start)
-
                     self.df_analysis = pd.merge(self.df_daily, self.df_weekly, on='종목코드', how='outer')
                     self.df_analysis = pd.merge(self.df_analysis, self.df_monthly, on='종목코드', how='outer')
                     self.df_analysis = pd.merge(self.df_analysis, self.df_investor, on='종목코드', how='outer')
@@ -4588,21 +4834,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.df_analysis = self.df_analysis[
                         ['번호', '종목명', '우선순위', '일봉1', '일봉2', '일봉3', '일봉4', '주봉1', '월봉1', '거래량', '기관', '외인', '개인']]
                     print(self.df_analysis.head())
-
                     conn = sqliteconn()
                     self.df_analysis.to_sql('종목분석', conn, if_exists='replace', index=False)
-
                     query = """
                                 select *
                                 from 종목분석
                             """
                     df = pd.read_sql(query, con=conn)
                     df.to_csv('종목분석.csv', index=False, encoding='euc-kr')
-
                     conn.close()
-
-                    logger.info('[XTrader]관심종목 데이터 업데이트 완료')
-                    Slack('[XTrader]관심종목 데이터 업데이트 완료')
+                    Telegram('[XTrader]관심종목 데이터 업데이트 완료')
 
             except Exception as e:
                 print('OnReceiveTrData_종목별투자자조회 : ', self.종목코드, e)
@@ -4898,11 +5139,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             for r in self.robots:
                 if r.running == True:
                     r.Run(flag=False)
+                    # Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
+                    logger.info("전체 ROBOT 실행 중지시킵니다.")                                                                                                                                     
 
             self.RobotView()
             self.RobotSaveSilently()
-            # Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
-            logger.info("전체 ROBOT 실행 중지시킵니다.")
+
 
             self.statusbar.showMessage("전체 ROBOT 실행 중지!!!")
 
