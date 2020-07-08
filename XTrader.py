@@ -1992,6 +1992,29 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             qty_ratio = 1
             return result, qty_ratio
 
+    # 보유일 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행(Mainwindow 타이머에서 시간 체크)
+    def hold_strategy(self):
+        if self.holdcheck == True:
+            print('보유일 만기 매도 체크')
+            for code in list(self.portfolio.keys()):
+                보유기간 = holdingcal(self.portfolio[code].매수일)
+                if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code) is None:
+                    self.portfolio[code].매도구간 = 0
+                    (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=self.portfolio[code].매수가,
+                                                수량=self.portfolio[code].수량)
+
+                    if result == True:
+                        self.주문실행중_Lock['S_%s' % code] = True
+                        Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                        logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                    else:
+                        Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                        logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
+
     # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
     def set_stocklist(self, data):
         self.Stocklist = dict()
@@ -2040,8 +2063,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.매수방법 = 매수방법
             self.매도방법 = 매도방법
             self.종목리스트 = 종목리스트
-
-            self.매수총액 = 0
 
             self.Stocklist = self.set_stocklist(self.종목리스트)
             self.Stocklist['전략'] = {
@@ -2099,6 +2120,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.금일매도종목 = [] # 장 마감 후 금일 매도한 종목에 대해서 매매이력 정리 업데이트(매도가, 손익률 등)
         self.매도할종목 = []
         self.매수할종목 = []
+        self.매수총액 = 0
+        self.holdcheck = False
 
         for code in codes: # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
             self.매수할종목.append(code)
@@ -2212,26 +2235,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 logger.info('정량매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                    현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
 
-                # 보유일 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
-                if current_time >= '15:29:00' and current_time < '15:30:00':
-                    for code in list(self.portfolio.keys()):
-                        보유기간 = holdingcal(self.portfolio[code].매수일)
-                        if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code):
-                            self.portfolio[code].매도구간 = 0
-                            (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=현재가,
-                                                        수량=self.portfolio[code].수량)
 
-                            if result == True:
-                                self.주문실행중_Lock['S_%s' % code] = True
-                                Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                                logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                            else:
-                                Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                                logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                                    code, self.portfolio[code].종목명, self.portfolio[code].수량))
         except Exception as e:
             print('CTradeShortTerm_실시간데이타처리 Error ', e)
             Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 : %s' % e)
@@ -2389,10 +2393,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.wr = csv.writer(self.f)
                     self.wr.writerow(['체결시간', '종목코드', '종목명', '현재가', '전일대비'])
 
-
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
                     logger.debug("실시간데이타요청 등록결과 %s" % ret)
-        
+
             except Exception as e:
                 print('CTradeShortTerm_Run Error :', e)
                 Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e)
@@ -3984,8 +3987,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.RobotStop()
             Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
 
-        # 16시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
-        if '18:10:00' <= current_time and current_time < '18:10:05':
+        # 18시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
+        if '18:00:00' <= current_time and current_time < '18:00:05':
             if self.DailyData == False:
                 self.DailyData = True
                 self.WeeklyData = False
@@ -3993,6 +3996,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.InvestorData = False
                 Telegram("[XTrader]관심종목 데이터 업데이트")
                 self.stock_analysis()
+
+        # TradeShortTerm 보유일 만기 매도 전략 체크용
+        if current_time >= '15:25:00' and current_time < '15:25:30':
+            if len(self.robots) > 0:
+                for r in self.robots:
+                    if r.sName == 'TradeShortTerm':
+                        if r.holdcheck == False:
+                            r.holdcheck = True
+                            r.hold_strategy()
 
         # if '153600' < current_time and current_time < '153659' and self.금일백업작업중 == False and self._login == True:# and current.weekday() == 4:
         # 수능일이면 아래 시간 조건으로 수정
