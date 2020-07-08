@@ -1996,24 +1996,27 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def hold_strategy(self):
         if self.holdcheck == True:
             print('보유일 만기 매도 체크')
-            for code in list(self.portfolio.keys()):
-                보유기간 = holdingcal(self.portfolio[code].매수일)
-                if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code) is None:
-                    self.portfolio[code].매도구간 = 0
-                    (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=self.portfolio[code].매수가,
-                                                수량=self.portfolio[code].수량)
+            try:
+                for code in list(self.portfolio.keys()):
+                    보유기간 = holdingcal(self.portfolio[code].매수일)
+                    if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code) is None:
+                        self.portfolio[code].매도구간 = 0
+                        (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=self.portfolio[code].매수가,
+                                                    수량=self.portfolio[code].수량)
 
-                    if result == True:
-                        self.주문실행중_Lock['S_%s' % code] = True
-                        Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                        logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                    else:
-                        Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
-                        logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
-                            code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                        if result == True:
+                            self.주문실행중_Lock['S_%s' % code] = True
+                            Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                            logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                        else:
+                            Telegram('[XTrader]정액매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                            logger.info('정량매도실패(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                                code, self.portfolio[code].종목명, self.portfolio[code].수량))
+            except Exception as e:
+                print("hold_strategy Error :", e)
 
     # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
     def set_stocklist(self, data):
