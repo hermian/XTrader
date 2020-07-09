@@ -1999,7 +1999,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             try:
                 for code in list(self.portfolio.keys()):
                     보유기간 = holdingcal(self.portfolio[code].매수일)
-                    if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code) is None:
+                    print('종목명 : %s, 보유일 : %s, 보유기간 : %s' %(self.portfolio[code].종목명, self.portfolio[code].보유일, 보유기간))
+                    if 보유기간 >= int(self.portfolio[code].보유일) and self.주문실행중_Lock.get('S_%s' % code) is None and self.portfolio[code].수량 != 0:
                         self.portfolio[code].매도구간 = 0
                         (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=self.portfolio[code].매수가,
                                                     수량=self.portfolio[code].수량)
@@ -2344,6 +2345,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.running = flag
         ret = 0
 
+        # self.portfolio.pop('243840') # 포트폴리오 오류 시 종목 강제 삭제
+        # self.RobotView()
         # 프로그램 비정상 종료 시 수동으로 포트폴리오 생성
         # self.manual_portfolio()
         # self.portfolio['298380'].매도전략 = '10'
@@ -2916,6 +2919,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         (result, order) = self.정액매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=매도가, 수량=self.portfolio[종목코드].수량)
                         if result == True:
                             self.주문실행중_Lock['S_%s' % 종목코드] = True
+                            if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
                             Telegram('[XTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
                             logger.info('[XTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
                         else:
@@ -3985,10 +3989,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 Slack('[XTrader]Robot Auto Run Error : %s' % e)
                 logger.error('Robot Auto Run Error : %s' % e)
 
-        # 15시 30분 : 로봇 정지
-        if '15:30:00' <= current_time and current_time < '15:30:05':
+        # 16시 00분 : 로봇 정지
+        if '16:00:00' <= current_time and current_time < '16:00:05':
             self.RobotStop()
-            Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
 
         # 18시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
         if '18:00:00' <= current_time and current_time < '18:00:05':
@@ -4001,7 +4004,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.stock_analysis()
 
         # TradeShortTerm 보유일 만기 매도 전략 체크용
-        if current_time >= '15:25:00' and current_time < '15:25:30':
+        if current_time >= '15:29:00' and current_time < '15:29:30':
             if len(self.robots) > 0:
                 for r in self.robots:
                     if r.sName == 'TradeShortTerm':
@@ -4901,7 +4904,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             for r in self.robots:
                 if r.running == True:
                     r.Run(flag=False)
-                    # Slack("[XTrader]전체 ROBOT 실행 중지시킵니다.")
                     logger.info("전체 ROBOT 실행 중지시킵니다.")                                                                                                                                     
 
             self.RobotView()
@@ -5155,9 +5157,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     model = PandasModel()
                     result = []
                     if RobotName == 'TradeShortTerm':
-                        self.portfolio_columns = ['번호', '종목코드', '종목명', '매수가', '매수조건', '매도전략', '수량', '매수일']
+                        self.portfolio_columns = ['번호', '종목코드', '종목명', '매수가', '수량', '매수조건', '매도전략', '보유일', '매수일']
                         for p, v in portfolio.items():
-                            result.append((v.번호, v.종목코드, v.종목명.strip(), v.매수가, v.매수조건, v.매도전략, v.수량, v.매수일))
+                            result.append((v.번호, v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수조건, v.매도전략,  v.보유일, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
                     elif RobotName == 'TradeCondition':
                         self.portfolio_columns = ['종목코드', '종목명', '매수가', '수량', '매수일']
