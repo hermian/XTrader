@@ -183,26 +183,39 @@ def import_googlesheet():
 with open('./secret/telegram_token.txt', mode='r') as tokenfile:
     TELEGRAM_TOKEN = tokenfile.readline().strip()
 with open('./secret/chatid.txt', mode='r') as chatfile:
-        CHAT_ID = int(chatfile.readline().strip())
+    CHAT_ID = int(chatfile.readline().strip())
 bot = telepot.Bot(TELEGRAM_TOKEN)
-telegram_enable = True
-def Telegram(str):
-    if telegram_enable == True:
-        bot.sendMessage(CHAT_ID,str)
-    else:
-        pass
 
+with open('./secret/Telegram.txt', mode='r') as tokenfile:
+    r = tokenfile.read()
+    TELEGRAM_TOKEN_yoo = r.split('\n')[0].split(', ')[1]
+    CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
+bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
+print(TELEGRAM_TOKEN_yoo, CHAT_ID_yoo)
+telegram_enable = False
+def Telegram(str, send='all'):
+    try:
+        if telegram_enable == True:
+            if send == 'mc':
+                bot.sendMessage(CHAT_ID, str)
+            else:
+                bot.sendMessage(CHAT_ID, str)
+                bot_yoo.sendMessage(CHAT_ID_yoo, str)
+        else:
+            pass
+    except Exception as e:
+        Telegram('[XTrader]Telegram Error : %s' % e, send='mc')
 
 # Slack Setting ***********************************************
-with open('./secret/slack_token.txt', mode='r') as tokenfile:
-    SLACK_TOKEN = tokenfile.readline().strip()
-slack = Slacker(SLACK_TOKEN)
-slack_enable = False
-def Slack(str):
-    if slack_enable == True:
-        slack.chat.post_message('#log', str)
-    else:
-        pass
+# with open('./secret/slack_token.txt', mode='r') as tokenfile:
+#     SLACK_TOKEN = tokenfile.readline().strip()
+# slack = Slacker(SLACK_TOKEN)
+# slack_enable = False
+# def Slack(str):
+#     if slack_enable == True:
+#         slack.chat.post_message('#log', str)
+#     else:
+#         pass
 
 # 매수 후 보유기간 계산 *****************************************
 today = datetime.date.today()
@@ -497,7 +510,7 @@ class CTrade(object):
         if self.update_cnt == 0:
             print('금일 실현 손익 구글 업로드 완료')
 
-            Slack("[XTrader]금일 실현 손익 구글 업로드 완료")
+            Telegram("[XTrader]금일 실현 손익 구글 업로드 완료")
             logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
 
     # 포트폴리오의 상태
@@ -628,8 +641,8 @@ class CTrade(object):
             return order
         except Exception as e:
             print('CTradeShortTerm_KiwoomSendOrder Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_KiwoomSendOrder : %s' % e)
-            logger.error('CTradeShortTerm_KiwoomSendOrder : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_KiwoomSendOrder Error: %s' % e, send='mc')
+            logger.error('CTradeShortTerm_KiwoomSendOrder Error : %s' % e)
         # -거래구분값 확인(2자리)
         #
         # 00 : 지정가
@@ -786,8 +799,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveTrData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveTrData : %s' % e)
-            logger.error('CTradeShortTerm_OnReceiveTrData : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveTrData Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_OnReceiveTrData Error : %s' % e)
 
     def OnReceiveChejanData(self, sGubun, nItemCnt, sFidList):
         """
@@ -863,7 +876,7 @@ class CTrade(object):
 
                 if len(화면번호.replace(' ','')) == 0 : # 로봇 실행중 영웅문으로 주문 발생 시 화면번호가 '    '로 들어와 에러발생함 방지
                     print('다른 프로그램을 통한 거래 발생')
-                    Telegram('다른 프로그램을 통한 거래 발생')
+                    Telegram('다른 프로그램을 통한 거래 발생', send='mc')
                     logger.info('다른 프로그램을 통한 거래 발생')
                     return
                 elif self.sScreenNo != int(화면번호[:4]):
@@ -968,8 +981,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveChejanData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveChejanData : %s' % e)
-            logger.error('CTradeShortTerm_OnReceiveChejanData : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveChejanData Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_OnReceiveChejanData Error : %s' % e)
 
     def OnReceiveRealData(self, sRealKey, sRealType, sRealData):
         """
@@ -1009,8 +1022,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveRealData Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData : %s' % e)
-            logger.error('CTradeShortTerm_OnReceiveRealData : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_OnReceiveRealData Error : %s' % e)
 
     """
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
@@ -1100,8 +1113,8 @@ class CTrade(object):
 
         except Exception as e:
             print('CTradeShortTerm_정액매수 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_정액매수 : %s' % e)
-            logger.error('CTradeShortTerm_정액매수 : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_정액매수 Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_정액매수 Error : %s' % e)
 
     def 정량매도(self, sRQName, 종목코드, 매도가, 수량):
         # sRQName = '정량매도%s' % self.sScreenNo
@@ -1123,8 +1136,8 @@ class CTrade(object):
             return ret
         except Exception as e:
             print('CTradeShortTerm_정량매도 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_정량매도 : %s' % e)
-            logger.error('CTradeShortTerm_정량매도 : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_정량매도 Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_정량매도 Error : %s' % e)
 
     def 정액매도(self, sRQName, 종목코드, 매도가, 수량):
         # sRQName = '정액매도%s' % self.sScreenNo
@@ -1796,7 +1809,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             except Exception as e:
                 print('CTradeShortTerm_save_history Error :', e)
-                Telegram('[XTrader]CTradeShortTerm_save_history Error : %s' % e)
+                Telegram('[XTrader]CTradeShortTerm_save_history Error : %s' % e, send='mc')
                 logger.error('CTradeShortTerm_save_history Error : %s' % e)
 
     # 시가 구간 확인(매수 전략 5, 3의 매수가 밴드)
@@ -1977,7 +1990,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             except Exception as e:
                 print('sell_strategy 매도전략 5 Error :', e)
                 logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code, e))
-                Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code, e))
+                Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 5 Error : %s' % (code, e), send='mc')
                 result = False
                 return result, qty_ratio
 
@@ -1986,7 +1999,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_sell_strategy Error : %s' % e)
             result = False
             qty_ratio = 1
@@ -2007,7 +2020,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                         if result == True:
                             self.주문실행중_Lock['S_%s' % code] = True
-                            Slack('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
+                            Telegram('[XTrader]정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
                                 code, self.portfolio[code].종목명, self.portfolio[code].수량))
                             logger.info('정량매도(보유일만기) : 종목코드=%s, 종목명=%s, 수량=%s' % (
                                 code, self.portfolio[code].종목명, self.portfolio[code].수량))
@@ -2056,8 +2069,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_set_portfolio Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_set_portfolio : %s' % e)
-            logger.error('CTradeShortTerm_set_portfolio : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_set_portfolio Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_set_portfolio Error : %s' % e)
 
     # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
     def Setting(self, sScreenNo, 매수방법='00',매도방법='03', 종목리스트=pd.DataFrame()):
@@ -2110,7 +2123,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print(self.Stocklist)
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
-            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_Setting Error : %s' % e)
 
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
@@ -2204,7 +2217,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                         self.set_portfolio(종목코드, 현재가, condition)
 
                                     self.주문실행중_Lock['B_%s' % 종목코드] = True
-                                    Slack('[XTrader]정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    Telegram('[XTrader]정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                                     logger.info('정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
     
                                 else:
@@ -2223,7 +2236,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                Slack('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
+                                Telegram('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
                                                                                                    self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                                 if self.portfolio[종목코드].매도전략 == '5':
                                     logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
@@ -2242,8 +2255,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_실시간데이타처리 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 : %s' % e)
-            logger.error('CTradeShortTerm_실시간데이타처리 : %s' % e)
+            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_실시간데이타처리 Error : %s' % e)
 
     def 접수처리(self, param):
         pass
@@ -2288,11 +2301,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.매수총액 += (P.매수가 * P.수량)
 
                         self.save_history(종목코드, status='매수')
-                        Slack('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
+                        Telegram('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
                         logger.info('%s %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
                         logger.info(self.portfolio[종목코드].__dict__)
                     except Exception as e:
-                        Telegram('[XTrader]체결처리_매수 POP에러 목명:%s ' % P.종목명)
+                        Telegram('[XTrader]체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
                         logger.error('체결처리_매수 POP에러 종목명:%s ' % P.종목명)
 
 
@@ -2315,10 +2328,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.Stocklist[종목코드]['매도수량'] = 주문수량
                         self.save_history(종목코드, status='매도')
 
-                        Slack('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+                        Telegram('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
-                    Telegram('[XTrader]체결처리_매도 Error : %s' % e)
+                    Telegram('[XTrader]체결처리_매도 Error : %s' % e, send='mc')
                     logger.error('체결처리_매도 Error : %s' % e)
 
         # 메인 화면에 반영
@@ -2363,7 +2376,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print("%s ROBOT 실행" % (self.sName))
 
             try:
-                Slack("[XTrader]%s ROBOT 실행" % (self.sName))
+                Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
 
                 self.sAccount = sAccount
 
@@ -2404,11 +2417,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             except Exception as e:
                 print('CTradeShortTerm_Run Error :', e)
-                Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e)
+                Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e, send='mc')
                 logger.error('CTradeShortTerm_Run Error : %s' % e)
 
         else:
-            Slack("[XTrader]%s ROBOT 실행 중지" % (self.sName))
+            Telegram("[XTrader]%s ROBOT 실행 중지" % (self.sName))
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
             self.f.close()
             del self.f
@@ -2791,7 +2804,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
             except Exception as e:
                 print('CTradeCondition_save_history Error :', e)
-                Telegram('[XTrader]CTradeCondition_save_history Error : %s' % e)
+                Telegram('[XTrader]CTradeCondition_save_history Error : %s' % e, send='mc')
                 logger.error('CTradeCondition_save_history Error : %s' % e)
 
     # 매도 전략
@@ -2985,7 +2998,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         Telegram('[XTrader]CTradeCondition 매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
                         logger.info('[XTrader]CTradeCondition %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
                     except Exception as e:
-                        Telegram('[XTrader]CTradeCondition 체결처리_매수 POP에러 목명:%s ' % P.종목명)
+                        Telegram('[XTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
                         logger.error('[XTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명)
 
         # 매도
@@ -3010,7 +3023,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         logger.info('[XTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
-                    Telegram('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
+                    Telegram('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e, send='mc')
                     logger.error('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
 
                 try:
@@ -3020,7 +3033,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             self.portfolio.pop(종목코드)
                             logger.info('체결처리_매도 포트폴리오POP %s ' % 종목코드)
                 except Exception as e:
-                    Telegram('[XTrader]CTradeCondition 체결처리_매도 POP에러 종목명:%s' % param['종목명'])
+                    Telegram('[XTrader]CTradeCondition 체결처리_매도 POP에러 종목명:%s' % param['종목명'], send='mc')
                     logger.error('[XTrader]CTradeCondition 체결처리_매도 POP에러 종목명:%s' % param['종목명'])
 
         # 메인 화면에 반영
@@ -3089,7 +3102,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
             except Exception as e:
                 print('CTradeCondition_Run Error :', e)
-                Telegram('[XTrader]CTradeCondition_Run Error : %s' % e)
+                Telegram('[XTrader]CTradeCondition_Run Error : %s' % e, send='mc')
                 logger.error('CTradeCondition_Run Error : %s' % e)
 
         else:
@@ -3739,7 +3752,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except Exception as e:
             print('MainWindow_Import_ShortTermStock Error', e)
-            Telegram('[XTrader]MainWindow_Import_ShortTermStock Error : %s' % e)
+            Telegram('[XTrader]MainWindow_Import_ShortTermStock Error : %s' % e, send='mc')
             logger.error('MainWindow_Import_ShortTermStock Error : %s' % e)
 
     # 금일 매도 종목에 대해서 수익률, 수익금, 수수료 요청(일별종목별실현손익요청)
@@ -3903,7 +3916,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         current_time = current.strftime('%H:%M:%S')
         if '07:00:00' <= current_time and current_time <= '08:58:00':
             print('구글 시트 오류 체크 시작')
-            Telegram('[XTrader]구글 시트 오류 체크 시작')
+            # Telegram('[XTrader]구글 시트 오류 체크 시작')
             self.statusbar.showMessage("구글 시트 오류 체크 시작")
 
             self.checkclock = QTimer(self)
@@ -3954,7 +3967,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 8시 32분 : 종목 데이블 생성
         if current_time == '08:32:00':
             print('종목테이블 생성')
-            Slack('[XTrader]종목테이블 생성')
+            # Slack('[XTrader]종목테이블 생성')
             self.StockCodeBuild(to_db=True)
             self.CODE_POOL = self.get_code_pool()  # DB 종목데이블에서 시장구분, 코드, 종목명, 주식수, 전일종가 읽어옴
             self.statusbar.showMessage("종목테이블 생성")
@@ -3962,7 +3975,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 8시 59분 : 구글 시트 종목 Import
         if current_time == '08:59:00':
             print('구글 시트 오류 체크 중지')
-            Telegram('[XTrader]구글 시트 오류 체크 중지')
+            # Telegram('[XTrader]구글 시트 오류 체크 중지')
             self.checkclock.stop()
 
             robot_list = []
@@ -3971,7 +3984,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             if 'TradeShortTerm' in robot_list:
                 print('구글시트 Import')
-                Slack('[XTrader]구글시트 Import')
+                Telegram('[XTrader]구글시트 Import')
                 self.Import_ShortTermStock(check=False)
 
                 self.statusbar.showMessage('구글시트 Import')
@@ -3986,7 +3999,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                             self.RobotView()
             except Exception as e:
                 print('Robot Auto Run Error', e)
-                Slack('[XTrader]Robot Auto Run Error : %s' % e)
+                Telegram('[XTrader]Robot Auto Run Error : %s' % e, send='mc')
                 logger.error('Robot Auto Run Error : %s' % e)
 
         # 16시 00분 : 로봇 정지
@@ -4000,7 +4013,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.WeeklyData = False
                 self.MonthlyData = False
                 self.InvestorData = False
-                Telegram("[XTrader]관심종목 데이터 업데이트")
+                Telegram("[XTrader]관심종목 데이터 업데이트", send='mc')
                 self.stock_analysis()
 
         # TradeShortTerm 보유일 만기 매도 전략 체크용
@@ -4353,7 +4366,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             current = datetime.datetime.now().strftime('%H:%M:%S')
             if current <= '08:58:00':
-                Slack("[XTrader]키움API 로그인 성공")
+                Telegram("[XTrader]키움API 로그인 성공")
 
             로그인상태 = True
             # 로그인 성공하고 바로 계좌 및 보유 주식 목록 저장
@@ -4608,7 +4621,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     df = pd.read_sql(query, con=conn)
                     df.to_csv('종목분석.csv', index=False, encoding='euc-kr')
                     conn.close()
-                    Telegram('[XTrader]관심종목 데이터 업데이트 완료')
+                    Telegram('[XTrader]관심종목 데이터 업데이트 완료', send='mc')
 
             except Exception as e:
                 print('OnReceiveTrData_종목별투자자조회 : ', self.종목코드, e)
@@ -4997,7 +5010,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print(robot_found.매수할종목)
             robot_found.매수할종목 = []
             logger.info('Robot_%s : 매수 모니터링 정지' % robot_found.sName)
-            Slack('[XTrade]Robot_%s : 매수 모니터링 정지' % robot_found.sName)
+            Telegram('[XTrade]Robot_%s : 매수 모니터링 정지' % robot_found.sName)
 
     def RobotLoad(self):
         reply = QMessageBox.question(self,
@@ -5263,11 +5276,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.robots.append(r)
             print('로봇 자동추가 완료')
             logger.info('로봇 자동추가 완료')
-            Slack('[XTrader]로봇 자동추가 완료')
+            Telegram('[XTrader]로봇 자동추가 완료')
 
         except Exception as e:
             print('RobotAutoAdd_TradeShortTerm', e)
-            Slack('[XTrader]로봇 자동추가 실패 : %s' % e)
+            Telegram('[XTrader]로봇 자동추가 실패 : %s' % e, send='mc')
 
     def RobotEdit_TradeShortTerm(self, robot):
         R = 화면_TradeShortTerm(parent=self)
@@ -5302,10 +5315,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             robot.Setting(sScreenNo=스크린번호, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
             print('로봇 자동편집 완료')
             logger.info('로봇 자동편집 완료')
-            Slack('[XTrader]로봇 자동편집 완료')
+            Telegram('[XTrader]로봇 자동편집 완료')
         except Exception as e:
             print('RobotAutoAdd_TradeShortTerm', e)
-            Slack('[XTrader]로봇 자동편집 실패 : %s' % e)
+            Telegram('[XTrader]로봇 자동편집 실패 : %s' % e, send='mc')
 
     # TradeCondition
     def RobotAdd_TradeCondition(self):
@@ -5440,7 +5453,7 @@ if __name__ == "__main__":
 
     current = datetime.datetime.now().strftime('%H:%M:%S')
     if current <= '08:58:00':
-        Slack("[XTrader]프로그램이 실행되었습니다.")
+        Telegram("[XTrader]프로그램이 실행되었습니다.")
 
 
     # 프로그램 실행 후 3초 후에 한번 신호 받고, 그 다음 1초 마다 신호를 계속 받음
