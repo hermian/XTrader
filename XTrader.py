@@ -141,7 +141,7 @@ def import_googlesheet():
                 if str(e) != '매수가1 공란' and str(e) != '매도전략5 매도가 공란' and str(e) != '전략 설정 오류': e = '종목명 오류'
                 print('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
                 logger.error('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
-                Slack('[XTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
+                Telegram('[XTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
 
             row[1] = name # 정상 종목명으로 저장
             row.insert(2, code)
@@ -191,7 +191,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     TELEGRAM_TOKEN_yoo = r.split('\n')[0].split(', ')[1]
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
-print(TELEGRAM_TOKEN_yoo, CHAT_ID_yoo)
+
 telegram_enable = False
 def Telegram(str, send='all'):
     try:
@@ -5384,7 +5384,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         try:
             result = []
 
-            markets = [['0', 'KOSPI'], ['10', 'KOSDAQ'], ['8', 'ETF']]
+            markets = [['0', 'KOSPI'], ['10', 'KOSDAQ']]#, ['8', 'ETF']]
             for [marketcode, marketname] in markets:
                 codelist = self.kiwoom.dynamicCall('GetCodeListByMarket(QString)', [
                     marketcode])  # sMarket – 0:장내, 3:ELW, 4:뮤추얼펀드, 5:신주인수권, 6:리츠, 8:ETF, 9:하이일드펀드, 10:코스닥, 30:제3시장
@@ -5410,16 +5410,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             # df.set_index('종목코드', inplace=True)
 
             if to_db == True:
+                # 테마코드
+                themecodes = []
+                ret = self.kiwoom.dynamicCall('GetThemeGroupList(int)', [1]).split(';')
+                for item in ret:
+                    [code, name] = item.split('|')
+                    themecodes.append([code, name])
+                df_theme = DataFrame(data=themecodes, columns=['테마코드', '테마명'])
+
+                # 테마구성종목
+                themestocks = []
+                for code, name in themecodes:
+                    codes = self.kiwoom.dynamicCall('GetThemeGroupCode(QString)', [code]).replace('A', '').split(';')
+                    for c in codes:
+                        themestocks.append([code, c])
+                df_themecode = DataFrame(data=themestocks, columns=['테마코드', '종목코드'])
+
+                # 종목코드와 테마명 합침
+                df_thememerge = pd.merge(df_theme, df_themecode, on='테마코드', how='outer')
+
                 df_code['상장일'] = df_code['상장일'].apply(lambda x: (x.to_pydatetime()).strftime('%Y-%m-%d %H:%M:%S'))
-                # print(df_code.values.tolist())
+
+                df_final = pd.merge(df_code, df_thememerge, on='종목코드', how='outer')
+                df_final = df_final[['시장구분', '종목코드', '종목명', '종목명체크', '주식수', '감리구분', '상장일', '전일종가', '종목상태', '테마명']]
+
                 conn = sqliteconn()
-                df_code.to_sql('종목코드', conn, if_exists='replace', index=False)
+                df_final.to_sql('종목코드', conn, if_exists='replace', index=False)
                 conn.close()
 
             return df_code
 
         except Exception as e:
-            print('StockCodeBuild', e)
+            print('StockCodeBuild Error :', e)
 
 if __name__ == "__main__":
     # 1.로그 인스턴스를 만든다.
