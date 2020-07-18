@@ -124,6 +124,7 @@ def import_googlesheet():
                 if row[idx_strategy[0]] == '' or row[idx_strategy[1]] == '': raise Exception('전략 설정 오류')  # 매수전략, 매도전략
                 if row[idx_buyprice] == '': raise Exception('매수가1 공란') # 매수가1
                 if row[idx_strategy[1]] == '2' and row[idx_sellprice] == '': raise Exception('매도전략2 매도가 공란') # 매도가
+                if row[idx_strategy[1]] == '4' and row[idx_sellprice] == '': raise Exception('매도전략4 매도가 공란') # 매도가
             except Exception as e:
                 name = ''
                 code = ''
@@ -318,10 +319,13 @@ class CPortStock_ShortTerm(object):
         self.매도가 = 매도가
         self.수량 = 수량
 
-        if self.매도전략 == '2':
+        if self.매도전략 == '2' or self.매도전략 == '3':
             self.목표도달 = False # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
             self.매도조건 = '' # 구간매도 : B, 목표매도 : T
-
+        elif self.매도전략 == '4':
+            self.sellcount = 0
+            self.목표가1도달 = False
+            self.목표가2도달 = False
 
 # CTrade 거래로봇용 베이스클래스 : OpenAPI와 붙어서 주문을 내는 등을 하는 클래스
 class CTrade(object):
@@ -1829,80 +1833,88 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
             매수가 = self.portfolio[code].매수가
 
-            # 매도를 위한 수익률 구간 체크(매수가 대비 현재가의 수익률 조건에 다른 구간 설정)
-            new_band = self.profit_band_check(현재가, 매수가)
-            if (hogacal(시가, 0, self.portfolio[code].시장, '상한가')) <= 현재가:
-                band = 7
-
-            if band < new_band: # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
-                band = new_band # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
-
-            if band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
-                result = True
-            elif band == 2 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[1] / 100)):
-                result = True
-            elif band == 3 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[2] / 100)):
-                result = True
-            elif band == 4 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[3] / 100)):
-                result = True
-            elif band == 5 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[4] / 100)):
-                result = True
-            elif band == 6 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[5] / 100)):
-                result = True
-            elif band == 7 and 현재가 >= (hogacal(시가, -3, self.Stocklist[code]['시장'], '상한가')):
-                매도방법 = '00' # 지정가
-                result = True
-
-            self.portfolio[code].매도구간 = band # 포트폴리오에 매도구간 업데이트
-
-            # 구간에서의 매도 조건 만족 시(구간 컷) 매도 수량 결정
-            qty_ratio = 1  # 매도전략 1(기존 10)일 경우 기본 전량매도
-
+            # 전략 1, 2, 3과 4 별도 체크
             strategy = self.portfolio[code].매도전략
-            try:
-                if strategy == '2':  # 매도전략 2(기존 5)
-                    목표가 = self.portfolio[code].매도가[0]
-                    매도조건 = self.portfolio[code].매도조건  # 매도가 실행된 조건 '': 매도 전, 'B':구간매도, 'T':목표가매도
+            # 전략 1, 2, 3
+            if strategy != '4':
+                # 매도를 위한 수익률 구간 체크(매수가 대비 현재가의 수익률 조건에 다른 구간 설정)
+                new_band = self.profit_band_check(현재가, 매수가)
+                if (hogacal(시가, 0, self.portfolio[code].시장, '상한가')) <= 현재가:
+                    band = 7
 
-                    target_band = self.profit_band_check(목표가, 매수가)
+                if band < new_band: # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
+                    band = new_band # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
 
-                    if band < target_band:  # 현재가구간이 목표가구간 미만일때 전량매도
-                        qty_ratio = 1
+                if band == 1 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[0] / 100)):
+                    result = True
+                elif band == 2 and 현재가 <= 매수가 * (1 + (self.portfolio[code].매도구간별조건[1] / 100)):
+                    result = True
+                elif band == 3 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[2] / 100)):
+                    result = True
+                elif band == 4 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[3] / 100)):
+                    result = True
+                elif band == 5 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[4] / 100)):
+                    result = True
+                elif band == 6 and 현재가 <= 고가 * (1 + (self.portfolio[code].매도구간별조건[5] / 100)):
+                    result = True
+                elif band == 7 and 현재가 >= (hogacal(시가, -3, self.Stocklist[code]['시장'], '상한가')):
+                    매도방법 = '00' # 지정가
+                    result = True
 
-                    else:  # 현재가구간이 목표가구간 이상일 때
-                        if 현재가 == 목표가:  # 목표가 도달 시 절반 매도
-                            self.portfolio[code].목표도달 = True  # 목표가 도달 여부 True
-                            if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
-                                self.portfolio[code].매도조건 = 'T'
-                                result = True
-                                qty_ratio = 0.5
-                            elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
-                                result = True
-                                qty_ratio = 1
-                            elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 매도미실행
-                                result = False
+                self.portfolio[code].매도구간 = band # 포트폴리오에 매도구간 업데이트
 
-                        else:  # 현재가가 목표가가 아닐 경우 구간 매도 실행(매도실행여부는 결정된 상태)
-                            if self.portfolio[code].목표도달 == False:  # 목표가 도달을 못한 경우면 전량매도
-                                qty_ratio = 1
-                            else:
-                                if 매도조건 == '':  # 매도이력이 없는 경우 구간매도 'B', 절반 매도
-                                    self.portfolio[code].매도조건 = 'B'
+                # 구간에서의 매도 조건 만족 시(구간 컷) 매도 수량 결정
+                qty_ratio = 1  # 매도전략 1(기존 10)일 경우 기본 전량매도
+
+                try:
+                    if strategy == '2' or strategy == '3':  # 매도전략 2(기존 5)
+                        if strategy == '2': 목표가 = self.portfolio[code].매도가[0]
+                        elif strategy == '3': 목표가 = (hogacal(시가 * 1.1, 0, self.Stocklist[code]['시장'], '현재가'))
+                        매도조건 = self.portfolio[code].매도조건  # 매도가 실행된 조건 '': 매도 전, 'B':구간매도, 'T':목표가매도
+
+                        target_band = self.profit_band_check(목표가, 매수가)
+
+                        if band < target_band:  # 현재가구간이 목표가구간 미만일때 전량매도
+                            qty_ratio = 1
+
+                        else:  # 현재가구간이 목표가구간 이상일 때
+                            if 현재가 == 목표가:  # 목표가 도달 시 절반 매도
+                                self.portfolio[code].목표도달 = True  # 목표가 도달 여부 True
+                                if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
+                                    self.portfolio[code].매도조건 = 'T'
+                                    result = True
                                     qty_ratio = 0.5
-                                elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 매도미실행
-                                    result = False
-                                elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 전량매도
+                                elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
+                                    result = True
                                     qty_ratio = 1
+                                elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 매도미실행
+                                    result = False
 
-            except Exception as e:
-                print('sell_strategy 매도전략 2 Error :', e)
-                logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e))
-                Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
-                result = False
+                            else:  # 현재가가 목표가가 아닐 경우 구간 매도 실행(매도실행여부는 결정된 상태)
+                                if self.portfolio[code].목표도달 == False:  # 목표가 도달을 못한 경우면 전량매도
+                                    qty_ratio = 1
+                                else:
+                                    if 매도조건 == '':  # 매도이력이 없는 경우 구간매도 'B', 절반 매도
+                                        self.portfolio[code].매도조건 = 'B'
+                                        qty_ratio = 0.5
+                                    elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 매도미실행
+                                        result = False
+                                    elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 전량매도
+                                        qty_ratio = 1
+
+                except Exception as e:
+                    print('sell_strategy 매도전략 2 Error :', e)
+                    logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e))
+                    Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
+                    result = False
+                    return 매도방법, result, qty_ratio
+
+                # print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s' % (code, 현재가, 시가, 고가, band, result))
                 return 매도방법, result, qty_ratio
 
-            # print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s' % (code, 현재가, 시가, 고가, band, result))
-            return 매도방법, result, qty_ratio
+            # 전략 4
+            else:
+                pass
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
@@ -1992,9 +2004,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             self.Stocklist['전략'] = {
                 '단위투자금': '',
                 '모니터링종료시간': '',
-                '시세조회단위': [],
                 '투자금비중': '',
-                '매도구간별조건': []
+                '매도구간별조건': [],
+                '전략매도가' : [],
+                '시세조회단위': []
             }
 
             strategy_sheet = doc.worksheet('ST bot')
@@ -2015,6 +2028,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 #     self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
                 elif '구간' in data[0]:
                     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
+                elif '손절가' == data[0]:
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                elif '익절가' in data[0]:
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
                 elif ('일봉' in data[0]) or ('주봉' in data[0]) or ('월봉' in data[0]):
                     self.Stocklist['전략']['시세조회단위'].append(int(data[1]))
 
@@ -2027,6 +2044,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.Stocklist[code]['시가체크'] = False
                     self.Stocklist[code]['매수상한도달'] = False
                     self.Stocklist[code]['매수조건'] = 0
+                    if self.Stocklist[code]['매도전략'] == '4':
+                        self.Stocklist[code]['매도가'].append(self.Stocklist['전략']['전략매도가'])
             print(self.Stocklist)
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
