@@ -53,10 +53,7 @@ credentials = ServiceAccountCredentials.from_json_keyfile_name(json_file_name, s
 gc = gspread.authorize(credentials)
 
 # XTrader-Stocklist URL
-# spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k/edit#gid=0' # Test Sheet
 spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1XE4sk0vDw4fE88bYMDZuJbnP4AF9CmRYHKY6fCXABw4/edit#gid=0' # Sheeet
-testsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLButple5bjl33TKZrCoMrim3k/edit#gid=0'
-
 
 # spreadsheet 연결 및 worksheet setting
 doc = gc.open_by_url(spreadsheet_url)
@@ -65,8 +62,6 @@ shortterm_history_sheet = doc.worksheet('매매이력')
 
 shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
                           '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
-condition_history_cols = ['종목명', '매수가', '매수일','매도가', '매도일',
-                        '수익률(계산)', '수익률', '수익금', '세금+수수료', '확정 수익금']
 
 # 구글 스프레드시트 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
 alpha_list = list(ascii_uppercase)
@@ -352,54 +347,6 @@ class CTrade(object):
         self.portfolio = dict()  # 포트폴리오 관리 {'종목코드':종목정보}
         self.현재가 = dict()  # 각 종목의 현재가
 
-    """
-    # 조건 검색식 종목 읽기
-    def GetCodes(self, Index, Name):
-        print("CTrade : GetCodes")
-        # logger.info("조건 검색식 종목 읽기")
-        # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
-        # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
-        # self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
-
-        try:
-            self.getConditionLoad()
-            self.sendCondition("0156", Name, Index, 0) # 선정된 검색조건식으로 바로 종목 검색
-
-        except Exception as e:
-            print("GetCondition_Error")
-            print(e)
-
-    def getConditionLoad(self):
-        self.kiwoom.dynamicCall("GetConditionLoad()")
-        print("CTrade : getConditionLoad")
-        # receiveConditionVer() 이벤트 메서드에서 루프 종료
-        self.ConditionLoop = QEventLoop()
-        self.ConditionLoop.exec_()
-
-    def getConditionNameList(self):
-        print("CTrade : getConditionNameList")
-        data = self.kiwoom.dynamicCall("GetConditionNameList()")
-
-        conditionList = data.split(';')
-        del conditionList[-1]
-
-        conditionDictionary = {}
-
-        for condition in conditionList:
-            key, value = condition.split('^')
-            conditionDictionary[int(key)] = value
-
-        return conditionDictionary
-
-    def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
-        print("CTrade : sendCondition")
-        isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int",
-                                     screenNo, conditionName, conditionIndex, isRealTime)
-
-        # receiveTrCondition() 이벤트 메서드에서 루프 종료
-        self.ConditionLoop = QEventLoop()
-        self.ConditionLoop.exec_()
-    """
     # 계좌 보유 종목 받음
     def InquiryList(self, _repeat=0):
         # print("CTrade : InquiryList")
@@ -440,9 +387,6 @@ class CTrade(object):
         if self.sName == 'TradeShortTerm':
             history_sheet = shortterm_history_sheet
             history_cols = shortterm_history_cols
-        elif self.sName == 'TradeCondition':
-            history_sheet = condition_history_sheet
-            history_cols = condition_history_cols
 
         code_row = history_sheet.findall(매도결과[0])[-1].row
 
@@ -986,51 +930,6 @@ class CTrade(object):
             Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_OnReceiveRealData Error : %s' % e)
 
-    """
-    def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
-        print("CTrade : OnReceiveTrCondition")
-        try:
-            if strCodeList == "":
-                return
-
-            self.codeList = strCodeList.split(';')
-            del self.codeList[-1]
-
-            print(self.codeList)
-            self.초기조건(self.codeList)
-
-        except Exception as e:
-            print("OnReceiveTrCondition_Error")
-            print(e)
-        finally:
-            # pass
-            self.ConditionLoop.exit()
-            # print("self.ConditionLoop : ", self.ConditionLoop.isRunning)
-    
-    def OnReceiveConditionVer(self, lRet, sMsg):
-        print("CTrade : OnReceiveConditionVer")
-        try:
-            self.condition = self.getConditionNameList()
-
-        except Exception as e:
-            print("CTrade : OnReceiveConditionVer_Error")
-
-        finally:
-            self.ConditionLoop.exit()
-
-    def OnReceiveRealCondition(self, sTrCode, strType, strConditionName, strConditionIndex):
-        # OpenAPI 메뉴얼 참조
-        # :param sTrCode:
-        # :param strType:
-        # :param strConditionName:
-        # :param strConditionIndex:
-        # :return:
-
-        logger.info(
-            'OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
-        print("CTrade : OnReceiveRealCondition")
-    """
-
     def 종목코드변환(self, code): # TR 통해서 받은 종목 코드에 A가 붙을 경우 삭제
         return code.replace('A', '')
 
@@ -1087,7 +986,7 @@ class CTrade(object):
             nQty = 수량
             nPrice = 매도가
             sHogaGb = self.매도방법  # 00:지정가, 03:시장가, 05:조건부지정가, 06:최유리지정가, 07:최우선지정가, 10:지정가IOC, 13:시장가IOC, 16:최유리IOC, 20:지정가FOK, 23:시장가FOK, 26:최유리FOK, 61:장개시전시간외, 62:시간외단일가매매, 81:시간외종가
-            if sHogaGb in ['03', '07', '06']:
+            if sHogaGb in ['03', '06', '07']:
                 nPrice = 0
             sOrgOrderNo = 0
 
@@ -1109,7 +1008,7 @@ class CTrade(object):
         nQty = 수량
         nPrice = 매도가
         sHogaGb = '00' #self.매도방법  # 00:지정가, 03:시장가, 05:조건부지정가, 06:최유리지정가, 07:최우선지정가, 10:지정가IOC, 13:시장가IOC, 16:최유리IOC, 20:지정가FOK, 23:시장가FOK, 26:최유리FOK, 61:장개시전시간외, 62:시간외단일가매매, 81:시간외종가
-        if sHogaGb in ['03', '07', '06']:
+        if sHogaGb in ['03', '06', '07']:
             nPrice = 0
         sOrgOrderNo = 0
 
@@ -1688,6 +1587,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
 
+
             # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
             if sell_price == '':
                 if status == '매수': # 포트폴리오 데이터 사용
@@ -1831,6 +1731,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             result = False
             band = self.portfolio[code].매도구간 # 이전 매도 구간 받음
             매도방법 = self.매도방법 # '03' : 지정가
+            qty_ratio = 1  # 매도 수량 결정 : 보유수량 * qty_ratio
 
             현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
             매수가 = self.portfolio[code].매수가
@@ -1864,9 +1765,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     result = True
 
                 self.portfolio[code].매도구간 = band # 포트폴리오에 매도구간 업데이트
-
-                # 구간에서의 매도 조건 만족 시(구간 컷) 매도 수량 결정
-                qty_ratio = 1  # 매도전략 1(기존 10)일 경우 기본 전량매도
 
                 try:
                     if strategy == '2' or strategy == '3':  # 매도전략 2(기존 5)
@@ -1916,34 +1814,50 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             # 전략 4(지정가 00 매도)
             else:
-                # 1. 매수 후 손절가까지 하락시 매도주문 -> 손절가, 전량매도로 끝
-                if 현재가 <= 매수가 * self.portfolio[code].매도가[1][0]:
-                    self.portfolio[code].매도구간 = 0
-                    return '00', True, 1
-                # 2. 1차익절가 도달시 매도주문 -> 1차익절가, 1/3 매도
-                elif self.portfolio[code].익절가1도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][1]:
-                    self.portfolio[code].매도구간 = 1
-                    self.portfolio[code].익절가1도달 = True
-                    return '00', True, 0.3
-                # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
-                elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][1]:
-                    self.portfolio[code].매도구간 = 1.5
-                    return '00', True, 1
-                # 4. 2차 익절가 도달 시 매도주문 -> 2차 익절가, 1/3 매도
-                elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][2]:
-                    self.portfolio[code].매도구간 = 2
-                    self.portfolio[code].익절가2도달 = True
-                    return '00', True, 0.5
-                # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
-                elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][2]:
-                    self.portfolio[code].매도구간 = 2.5
-                    return '00', True, 1
-                # 6. 목표가 도달 시 매도주문 -> 목표가, 나머지 전량 매도로 끝
-                elif self.portfolio[code].목표가도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[0]:
-                    self.portfolio[code].매도구간 = 3
-                    self.portfolio[code].목표가도달 = True
-                    return '00', True, 1
-                
+                매도방법 = '00'
+                try:
+                    # 1. 매수 후 손절가까지 하락시 매도주문 -> 손절가, 전량매도로 끝
+                    if 현재가 <= 매수가 * self.portfolio[code].매도가[1][0]:
+                        self.portfolio[code].매도구간 = 0
+                        result = True
+                        qty_ratio = 1
+                    # 2. 1차익절가 도달시 매도주문 -> 1차익절가, 1/3 매도
+                    elif self.portfolio[code].익절가1도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][1]:
+                        self.portfolio[code].매도구간 = 1
+                        self.portfolio[code].익절가1도달 = True
+                        result = True
+                        qty_ratio = 0.3
+                    # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
+                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][1]:
+                        self.portfolio[code].매도구간 = 1.5
+                        result = True
+                        qty_ratio = 1
+                    # 4. 2차 익절가 도달 시 매도주문 -> 2차 익절가, 1/3 매도
+                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][2]:
+                        self.portfolio[code].매도구간 = 2
+                        self.portfolio[code].익절가2도달 = True
+                        result = True
+                        qty_ratio = 0.5
+                    # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
+                    elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][2]:
+                        self.portfolio[code].매도구간 = 2.5
+                        result = True
+                        qty_ratio = 1
+                    # 6. 목표가 도달 시 매도주문 -> 목표가, 나머지 전량 매도로 끝
+                    elif self.portfolio[code].목표가도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[0]:
+                        self.portfolio[code].매도구간 = 3
+                        self.portfolio[code].목표가도달 = True
+                        result = True
+                        qty_ratio = 1
+
+                    return 매도방법, result, qty_ratio
+
+                except Exception as e:
+                    print('sell_strategy 매도전략 4 Error :', e)
+                    logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 4 Error : %s' % (code, e))
+                    Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 4 Error : %s' % (code, e), send='mc')
+                    result = False
+                    return 매도방법, result, qty_ratio
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
@@ -2172,12 +2086,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                         self.set_portfolio(종목코드, 현재가, condition)
 
                                     self.주문실행중_Lock['B_%s' % 종목코드] = True
-                                    Telegram('[XTrader]정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
-                                    logger.info('정액매수 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    Telegram('[XTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
     
                                 else:
-                                    Telegram('[XTrader]정액매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
-                                    logger.info('정액매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    Telegram('[XTrader]매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                     
                 # 매도 조건
                 if 종목코드 in self.매도할종목:
@@ -2191,24 +2105,24 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                                             수량=int(self.portfolio[종목코드].수량 * ratio))
                             else:
                                 (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가,
-                                                        수량=int(self.portfolio[종목코드].수량*ratio))
+                                                        수량=int(self.portfolio[종목코드].수량 * ratio))
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                Telegram('[XTrader]정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
+                                Telegram('[XTrader]매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
                                                                                                    self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                                 if self.portfolio[종목코드].매도전략 == '2':
-                                    logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
+                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                                       현재가,self.portfolio[종목코드].매도구간,
                                                                                                                       self.portfolio[종목코드].목표도달,
                                                                                                                       self.portfolio[종목코드].매도조건,int(self.portfolio[종목코드].수량 * ratio)))
                                 else:
-                                    logger.info('정량매도 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                     현재가, self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                             else:
-                                Telegram('[XTrader]정액매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                Telegram('[XTrader]매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                         현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
-                                logger.info('정량매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                logger.info('매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
                                                                                                    현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
 
 
@@ -2265,7 +2179,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.save_history(종목코드, status='매수')
                         Telegram('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
                         logger.info('%s %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
-                        logger.info(self.portfolio[종목코드].__dict__)
                     except Exception as e:
                         Telegram('[XTrader]체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
                         logger.error('체결처리_매수 POP에러 종목명:%s ' % P.종목명)
@@ -2665,21 +2578,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 Telegram('[XTrader]Robot Auto Run Error : %s' % e, send='mc')
                 logger.error('Robot Auto Run Error : %s' % e)
 
-        # 16시 00분 : 로봇 정지
-        if '16:00:00' <= current_time and current_time < '16:00:05':
-            self.RobotStop()
-
-        # 18시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
-        if '18:00:00' <= current_time and current_time < '18:00:05':
-            if self.DailyData == False:
-                self.DailyData = True
-                self.WeeklyData = False
-                self.MonthlyData = False
-                self.InvestorData = False
-                Telegram("[XTrader]관심종목 데이터 업데이트", send='mc')
-                self.stock_analysis()
-
-        # TradeShortTerm 보유일 만기 매도 전략 체크용
+        # 15시 29분 :TradeShortTerm 보유일 만기 매도 전략 체크 후 주문
         if current_time >= '15:29:00' and current_time < '15:29:30':
             if len(self.robots) > 0:
                 for r in self.robots:
@@ -2688,45 +2587,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                             r.holdcheck = True
                             r.hold_strategy()
 
-        # if '153600' < current_time and current_time < '153659' and self.금일백업작업중 == False and self._login == True:# and current.weekday() == 4:
-        # 수능일이면 아래 시간 조건으로 수정
-        # if '17:00:00' < current.strftime('%H:%M:%S') and current.strftime('%H:%M:%S') < '17:00:59' and self.금일백업작업중 == False and self._login == True:
-        #     self.금일백업작업중 = True
-        #     self.Backup(작업=None)
-        #     pass
+        # 16시 00분 : 로봇 정지
+        if '16:00:00' <= current_time and current_time < '16:00:05':
+            self.RobotStop()
 
-        # 로봇을 저장
-        # if self.시작시각.strftime('%H:%M:%S') > '08:00:00' and self.시작시각.strftime('%H:%M:%S') < '15:30:00' and current.strftime('%H:%M:%S') > '01:00:00':
-        #     if len(self.robots) > 0:
-        #         self.RobotSave()
-
-        #     for k in self.dialog:
-        #         self.dialog[k].KiwoomDisConnect()
-        #         try:
-        #             self.dialog[k].close()
-        #         except Exception as e:
-        #             pass
-
-        #     self.close()
-
-        # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        """elif current_time < '15:30:00': # 장 마감 이전
-            if current.weekday() in workday_list: # 주중인지 확인
-                if current_time in savetime_list: # 지정된 시간인지 확인
-                    logger.info("조건검색식 타이머 작동")
-                    Telegram(str(current)[:-7] + " : " + "조건검색식 종목 검색")
-                    self.GetCondition()  # 조건검색식을 모두 읽어서 해당하는 종목 저장"""
-        # if current.second == 0:  # 매 0초
-        #     # if current.minute % 10 == 0:  # 매 10 분
-        #     if current.minute == 1 or current.strftime('%H:%M:%S') == '09:30:00' or current.strftime('%H:%M:%S') == '15:15:00':  # 매시 1분
-        #         logger.info("조건검색식 타이머 작동")
-        #         Telegram(str(current)[:-7] + " : " + "조건검색식 종목 검색")
-        #         # print(current.minute, current.second)
-        #         self.GetCondition() # 조건검색식을 모두 읽어서 해당하는 종목 저장
-        # for r in self.robots:
-        #     if r.running == True:  # 로봇이 실행중이면
-        #         # print(r.sName, r.running)
-        #         pass
+        # 16시 05분 : 프로그램 종료
+        if '16:05:00' <= current_time and current_time < '16:05:05':
+            Telegram("[XTrade]프로그램을 종료합니다.")
+            quit()
 
     # 주문 제한 초기화
     def limit_per_second(self):
