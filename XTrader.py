@@ -324,8 +324,10 @@ class CPortStock_ShortTerm(object):
             self.매도조건 = '' # 구간매도 : B, 목표매도 : T
         elif self.매도전략 == '4':
             self.sellcount = 0
-            self.목표가1도달 = False
-            self.목표가2도달 = False
+            self.매도단위수량 = 0 # 전략4의 기본 매도 단위는 보유수량의 1/3
+            self.익절가1도달 = False
+            self.익절가2도달 = False
+            self.목표가도달 = False
 
 # CTrade 거래로봇용 베이스클래스 : OpenAPI와 붙어서 주문을 내는 등을 하는 클래스
 class CTrade(object):
@@ -1912,9 +1914,36 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 # print('종목코드 : %s, 현재가 : %s, 시가 : %s, 고가 : %s, 매도구간 : %s, 결과 : %s' % (code, 현재가, 시가, 고가, band, result))
                 return 매도방법, result, qty_ratio
 
-            # 전략 4
+            # 전략 4(지정가 00 매도)
             else:
-                pass
+                # 1. 매수 후 손절가까지 하락시 매도주문 -> 손절가, 전량매도로 끝
+                if 현재가 <= 매수가 * self.portfolio[code].매도가[1][0]:
+                    self.portfolio[code].매도구간 = 0
+                    return '00', True, 1
+                # 2. 1차익절가 도달시 매도주문 -> 1차익절가, 1/3 매도
+                elif self.portfolio[code].익절가1도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][1]:
+                    self.portfolio[code].매도구간 = 1
+                    self.portfolio[code].익절가1도달 = True
+                    return '00', True, 0.3
+                # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
+                elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][1]:
+                    self.portfolio[code].매도구간 = 1.5
+                    return '00', True, 1
+                # 4. 2차 익절가 도달 시 매도주문 -> 2차 익절가, 1/3 매도
+                elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[1][2]:
+                    self.portfolio[code].매도구간 = 2
+                    self.portfolio[code].익절가2도달 = True
+                    return '00', True, 0.5
+                # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
+                elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * self.portfolio[code].매도가[1][2]:
+                    self.portfolio[code].매도구간 = 2.5
+                    return '00', True, 1
+                # 6. 목표가 도달 시 매도주문 -> 목표가, 나머지 전량 매도로 끝
+                elif self.portfolio[code].목표가도달 == False and 현재가 >= 매수가 * self.portfolio[code].매도가[0]:
+                    self.portfolio[code].매도구간 = 3
+                    self.portfolio[code].목표가도달 = True
+                    return '00', True, 1
+                
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
@@ -2217,6 +2246,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     P.종목명 = param['종목명']
                     P.매수가 = 체결가 # 단위체결가
                     P.수량 += 단위체결량 # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
+                    if P.매도전략 == '4': P.매도단위수량 = int(P.수량 / 3) # 전략4의 매도단위수량은 매수수량/3
+
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
                 else:
                     logger.error('ERROR 포트에 종목이 없음 !!!!')
@@ -2228,6 +2259,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.매도할종목.append(종목코드)
 
                         self.Stocklist[종목코드]['수량'] = P.수량
+
                         self.매수총액 += (P.매수가 * P.수량)
 
                         self.save_history(종목코드, status='매수')
