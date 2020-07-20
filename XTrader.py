@@ -1860,9 +1860,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     return 매도방법, result, qty_ratio
 
         except Exception as e:
-            print('CTradeShortTerm_sell_strategy Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
-            logger.error('CTradeShortTerm_sell_strategy Error : %s' % e)
+            print('CTradeShortTerm_sell_strategy Error code:%s, 시세:%s, 매수가:%s, error:%s' % (code, price, 매수가, e))
+            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error code:%s, 시세:%s, 매수가:%s, error:%s' % (code, price, 매수가, e),send='mc')
+            logger.error('CTradeShortTerm_sell_strategy Error code:%s, 시세:%s, 매수가:%s, error:%s' % (code, price, 매수가, e))
             result = False
             qty_ratio = 1
             return 매도방법, result, qty_ratio
