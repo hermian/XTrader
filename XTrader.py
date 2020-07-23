@@ -1569,6 +1569,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
             sell_price = shortterm_history_sheet.acell(str(cell)).value
 
+
             # 매도 이력은 추가 매도(매도전략2의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
             if status == '매도':  # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
                 cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)
@@ -1586,6 +1587,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
 
+                계산수익률 = round((self.Stocklist[code]['매도체결가'] / self.Stocklist[code]['매수가'] - 1) * 100, 2)
+                cell = alpha_list[shortterm_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
+                shortterm_history_sheet.update_acell(cell, 계산수익률)
 
             # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
             if sell_price == '':
@@ -2108,21 +2112,16 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                Telegram('[XTrader]매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가,
-                                                                                                   self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
+                                Telegram('[XTrader]매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                                 if self.portfolio[종목코드].매도전략 == '2':
-                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                                      현재가,self.portfolio[종목코드].매도구간,
-                                                                                                                      self.portfolio[종목코드].목표도달,
-                                                                                                                      self.portfolio[종목코드].매도조건,int(self.portfolio[종목코드].수량 * ratio)))
+                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].목표도달, self.portfolio[종목코드].매도조건, int(self.portfolio[종목코드].수량 * ratio)))
                                 else:
-                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                    현재가, self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
+                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, int(self.portfolio[종목코드].수량 * ratio)))
                             else:
-                                Telegram('[XTrader]매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                        현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
-                                logger.info('매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
-                                                                                                   현재가, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
+                                Telegram('[XTrader]매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                                                                                        현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
+                                logger.info('매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (종목코드, 종목명,
+                                                                                                   현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, self.portfolio[종목코드].수량*ratio))
 
 
         except Exception as e:
@@ -2197,6 +2196,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         if P is not None:
                             P.종목명 = param['종목명']
 
+                        self.Stocklist[종목코드]['매수가'] = self.portfolio[종목코드].매수가
                         self.Stocklist[종목코드]['매도체결가'] = 체결가
                         self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
                         self.Stocklist[종목코드]['매도수량'] = 주문수량
