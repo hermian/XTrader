@@ -1930,7 +1930,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
                                     self.portfolio[code].매도조건 = 'T'
                                     result = True
-                                    qty_ratio = 0.5
+                                    if self.portfolio[code].수량 == 1:
+                                        qty_ratio = 1
+                                    else:
+                                        qty_ratio = 0.5
                                 elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
                                     result = True
                                     qty_ratio = 1
@@ -1943,7 +1946,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 else:
                                     if 매도조건 == '':  # 매도이력이 없는 경우 구간매도 'B', 절반 매도
                                         self.portfolio[code].매도조건 = 'B'
-                                        qty_ratio = 0.5
+                                        if self.portfolio[code].수량 == 1:
+                                            qty_ratio = 1
+                                        else:
+                                            qty_ratio = 0.5
                                     elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 매도미실행
                                         result = False
                                     elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 전량매도
@@ -1974,7 +1980,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].매도구간 = 1
                         self.portfolio[code].익절가1도달 = True
                         result = True
-                        qty_ratio = 0.3
+                        if self.portfolio[code].수량 == 1:
+                            qty_ratio = 1
+                        elif self.portfolio[code].수량 == 2:
+                            qty_ratio = 0.5
+                        else:
+                            qty_ratio = 0.3
                     # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
                     elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * (
                             1 + self.portfolio[code].매도가[1][1] / 100):
@@ -1987,7 +1998,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].매도구간 = 2
                         self.portfolio[code].익절가2도달 = True
                         result = True
-                        qty_ratio = 0.5
+                        if self.portfolio[code].수량 == 1:
+                            qty_ratio = 1
+                        else:
+                            qty_ratio = 0.5
                     # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
                     elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * (
                             1 + self.portfolio[code].매도가[1][2] / 100):
@@ -4052,7 +4066,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if len(self.robots) > 0:
                     for r in self.robots:
                         if r.running == False:  # 로봇이 실행중이 아니면
-                            r.Run(flag=True, sAccount=로봇거래계좌번호)
+                            #r.Run(flag=True, sAccount=로봇거래계좌번호)
                             self.RobotView()
             except Exception as e:
                 print('Robot Auto Run Error', e)
@@ -4104,8 +4118,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        if current_time > '09:00:00' and current_time < '10:00:00':
-            if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
+        if current_time > '08:59:00' and current_time < '15:30:00':
+            #if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
+            if current.second == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
                 self.GetCondition()
 
