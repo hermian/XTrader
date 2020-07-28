@@ -1786,7 +1786,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 if 매도조건 == '':  # 매도이력이 없는 경우 목표가매도 'T', 절반 매도
                                     self.portfolio[code].매도조건 = 'T'
                                     result = True
-                                    qty_ratio = 0.5
+                                    if self.portfolio[code].수량 == 1: qty_ratio = 1
+                                    else: qty_ratio = 0.5
                                 elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 절반매도가 된 상태이므로 남은 전량매도
                                     result = True
                                     qty_ratio = 1
@@ -1799,7 +1800,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                 else:
                                     if 매도조건 == '':  # 매도이력이 없는 경우 구간매도 'B', 절반 매도
                                         self.portfolio[code].매도조건 = 'B'
-                                        qty_ratio = 0.5
+                                        if self.portfolio[code].수량 == 1: qty_ratio = 1
+                                        else: qty_ratio = 0.5
                                     elif 매도조건 == 'B':  # 구간 매도 이력이 있을 경우 매도미실행
                                         result = False
                                     elif 매도조건 == 'T':  # 목표가 매도 이력이 있을 경우 전량매도
@@ -1829,7 +1831,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].매도구간 = 1
                         self.portfolio[code].익절가1도달 = True
                         result = True
-                        qty_ratio = 0.3
+                        if self.portfolio[code].수량 == 1:qty_ratio = 1
+                        elif self.portfolio[code].수량 == 2:qty_ratio = 0.5
+                        else:qty_ratio = 0.3
                     # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
                     elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][1] / 100):
                         self.portfolio[code].매도구간 = 1.5
@@ -1840,7 +1844,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].매도구간 = 2
                         self.portfolio[code].익절가2도달 = True
                         result = True
-                        qty_ratio = 0.5
+                        if self.portfolio[code].수량 == 1:qty_ratio = 1
+                        else:qty_ratio = 0.5
                     # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
                     elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][2] / 100):
                         self.portfolio[code].매도구간 = 2.5
