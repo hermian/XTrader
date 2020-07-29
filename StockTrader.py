@@ -1025,7 +1025,7 @@ class CTrade(object):
             Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_OnReceiveRealData Error : %s' % e)
 
-    """
+
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
         print("CTrade : OnReceiveTrCondition")
         try:
@@ -1058,6 +1058,7 @@ class CTrade(object):
             self.ConditionLoop.exit()
 
     def OnReceiveRealCondition(self, sTrCode, strType, strConditionName, strConditionIndex):
+        print("CTrade : OnReceiveRealCondition")
         # OpenAPI 메뉴얼 참조
         # :param sTrCode:
         # :param strType:
@@ -1067,8 +1068,8 @@ class CTrade(object):
 
         logger.info(
             'OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
-        print("CTrade : OnReceiveRealCondition")
-    """
+
+
 
     def 종목코드변환(self, code): # TR 통해서 받은 종목 코드에 A가 붙을 경우 삭제
         return code.replace('A', '')
@@ -2821,9 +2822,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.d = today
 
         self.보유일 = 1
-        self.매수가비율 = -1.5 # percent 전일 종가 대비
         self.익절 = 5 # percent
         self.손절 = -2.7 # percent
+        self.투자금비중 = 70 # 예수금 대비 percent
 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
@@ -2896,7 +2897,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         return result, sell_price
 
     # 조건식 선택에 의해서 투자금, 매수/도 방법, 포트폴리오 수, 검색 종목 등이 저장됨
-    def Setting(self, sScreenNo, 포트폴리오수, 조건식인덱스, 조건식명, 단위투자금, 매수방법, 매도방법, 종목리스트):
+    def Setting(self, sScreenNo, 포트폴리오수, 조건식인덱스, 조건식명, 단위투자금, 매수방법, 매도방법):
         # print("CTradeCondition : Setting")
         self.sScreenNo = sScreenNo
         self.단위투자금 = 단위투자금
@@ -2905,7 +2906,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.포트폴리오수 = 포트폴리오수
         self.조건식인덱스 = 조건식인덱스
         self.조건식명 = 조건식명
-        self.종목리스트 = 종목리스트
+        #self.종목리스트 = 종목리스트
 
         print("조검검색 로봇 셋팅 완료")
 
@@ -2914,34 +2915,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         # print("CTradeCondition : 초기조건")
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
 
-        self.Stocklist = {}
-        self.Stocklist['전략'] = {
-            '단위투자금': '',
-            '보유일': 1,
-            '매도구간별조건': []
-        }
-
-        strategy_sheet = doc.worksheet('ST bot')
-        row_data = strategy_sheet.get_all_values()
-
-        for data in row_data:
-            if data[0] == '단위투자금':
-                self.Stocklist['전략']['단위투자금'] = int(data[1])
-            elif data[0] == '투자금 비중':
-                self.투자금비중 = 100 - float(data[1][:-1])
-            elif data[0] == '손절율':
-                self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
-            elif '구간' in data[0]:
-                self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
-
-        self.Stocklist['전략']['매도구간별조건'].insert(1, 0.3)
-        # self.단위투자금 = self.Stocklist['전략']['단위투자금']
-
-        print(self.Stocklist)
-
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
-
         self.금일매도종목 = []
         self.매도할종목 = []
         self.매수할종목 = []
@@ -3001,7 +2976,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             logger.info('[XTrader]CTradeCondition 정액매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
 
             # 매수할 종목에 대해서 정액매수 주문하고 포트폴리오/매도할종목에 추가, 매수할종목에서 제외
-            if current_time < '10:00:00':
+            if current_time <= '10:00:00':
                 if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
                     if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
                         if 현재가 <= 전일종가 * (1-(abs(self.매수가비율)/100)) and (self.단위투자금 // 현재가 > 0):
@@ -3136,7 +3111,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 print("조건식 인덱스 : ", self.조건식인덱스)
                 print("조건식명 : ", self.조건식명)
-                print(self.종목리스트)
 
                 codes = self.종목리스트['종목코드'].values
                 self.초기조건(codes)
@@ -4120,7 +4094,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
         if current_time > '08:59:00' and current_time < '15:30:00':
             #if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
-            if current.second == 0 and self.ConditionCheck == False:
+            if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
                 self.GetCondition()
 
@@ -4859,6 +4833,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         pass
 
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
+        if self.ScreenNumber != int(sScrNo):
+            return
+
         logger.debug('main:OnReceiveTrCondition [%s] [%s] [%s] [%s] [%s]' % (
             sScrNo, strCodeList, strConditionName, nIndex, nNext))
 
@@ -4922,8 +4899,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.conditionLoop.exit()
 
     def OnReceiveConditionVer(self, lRet, sMsg):
-        # logger.debug('main:OnReceiveConditionVer : [이벤트] 조건식 저장',lRet, sMsg)  머니봇의 오류 코드를 아래와 같이 수정하여 logger Error 방지함(18.06.13)
-
         logger.debug('main:OnReceiveConditionVer : [이벤트] 조건식 저장 [%s] [%s]' % (lRet, sMsg))
 
         # getConditionLoad() 메서드의 조건식 목록 요청에 대한 응답 이벤트
@@ -5406,11 +5381,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             포트폴리오수 = int(R.lineEdit_portsize.text().strip())
             조건식인덱스 = R.df_condition['Index'][R.comboBox_condition.currentIndex()]  # 조건식의 인덱스 넘김
             조건식명 = R.df_condition['Name'][R.comboBox_condition.currentIndex()]  # 조건식의 이름 넘김
-            종목리스트 = R.data
+            #종목리스트 = R.data
 
             r = CTradeCondition(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
-            r.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 포트폴리오수=포트폴리오수, 조건식인덱스=조건식인덱스, 조건식명=조건식명, 매수방법=매수방법, 매도방법=매도방법,
-                      종목리스트=종목리스트)
+            r.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 포트폴리오수=포트폴리오수, 조건식인덱스=조건식인덱스, 조건식명=조건식명, 매수방법=매수방법, 매도방법=매도방법)
 
             self.robots.append(r)
 
@@ -5433,11 +5407,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             포트폴리오수 = int(R.lineEdit_portsize.text().strip())
             조건식인덱스 = R.df_condition['Index'][R.comboBox_condition.currentIndex()]  # 조건식의 인덱스 넘김
             조건식명 = R.df_condition['Name'][R.comboBox_condition.currentIndex()]  # 조건식의 이름 넘김
-            종목리스트 = R.data
+            #종목리스트 = R.data
 
             robot.sName = 이름
-            robot.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 포트폴리오수=포트폴리오수, 조건식인덱스=조건식인덱스, 조건식명=조건식명, 매수방법=매수방법, 매도방법=매도방법,
-                          종목리스트=종목리스트)
+            robot.Setting(sScreenNo=스크린번호, 단위투자금=단위투자금, 포트폴리오수=포트폴리오수, 조건식인덱스=조건식인덱스, 조건식명=조건식명, 매수방법=매수방법, 매도방법=매도방법)
 
     def ConditionMonitoring(self):
         print("MainWindow : ConditionMonitoring")
