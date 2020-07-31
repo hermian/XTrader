@@ -1027,7 +1027,6 @@ class CTrade(object):
             Telegram('[XTrader]CTradeShortTerm_OnReceiveRealData Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_OnReceiveRealData Error : %s' % e)
 
-    """
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
         print("CTrade : OnReceiveTrCondition")
         try:
@@ -1038,15 +1037,15 @@ class CTrade(object):
             del self.codeList[-1]
 
             print(self.codeList)
-            self.초기조건(self.codeList)
+            # self.초기조건(self.codeList)
 
         except Exception as e:
             print("OnReceiveTrCondition_Error")
             print(e)
 
         finally:
-            # pass
-            self.ConditionLoop.exit()
+            pass
+            # self.ConditionLoop.exit()
             # print("self.ConditionLoop : ", self.ConditionLoop.isRunning)
     
     def OnReceiveConditionVer(self, lRet, sMsg):
@@ -1071,7 +1070,7 @@ class CTrade(object):
 
         logger.info(
             'OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
-    """
+
 
     def 종목코드변환(self, code): # TR 통해서 받은 종목 코드에 A가 붙을 경우 삭제
         return code.replace('A', '')
@@ -2610,7 +2609,7 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
 
     # 조건검색 해당 종목 요청 메서드
     def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
-        # print("화면_TradeCondition : sendCondition")
+        print("화면_TradeCondition : sendCondition")
         """
         종목 조건검색 요청 메서드
 
@@ -2632,8 +2631,8 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
                                      screenNo, conditionName, conditionIndex, isRealTime)
 
         # OnReceiveTrCondition() 이벤트 메서드에서 루프 종료
-        self.conditionLoop = QEventLoop()
-        self.conditionLoop.exec_()
+        # self.conditionLoop = QEventLoop()
+        # self.conditionLoop.exec_()
 
     # 조건 검색 관련 ActiveX와 On시리즈와 붙임(콜백)
     def KiwoomConnect(self):
@@ -2686,7 +2685,7 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
 
     # 조건검색 세부 종목 조회 요청시 발생되는 이벤트
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
-        logger.debug('main:OnReceiveTrCondition [%s] [%s] [%s] [%s] [%s]' % (sScrNo, strCodeList, strConditionName, nIndex, nNext))
+        logger.debug('화면_TradeCondition:OnReceiveTrCondition [%s] [%s] [%s] [%s] [%s]' % (sScrNo, strCodeList, strConditionName, nIndex, nNext))
         # print("화면_TradeCondition : OnReceiveTrCondition")
         """
         (1회성, 실시간) 종목 조건검색 요청시 발생되는 이벤트
@@ -2765,7 +2764,7 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
 
     # 실시간 종목 조건검색 요청시 발생되는 이벤트
     def OnReceiveRealCondition(self, sTrCode, strType, strConditionName, strConditionIndex):
-        logger.debug('main:OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
+        logger.debug('화면_TradeCondition:OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
         # print("화면_TradeCondition : OnReceiveRealCondition")
         """
         실시간 종목 조건검색 요청시 발생되는 이벤트
@@ -2789,7 +2788,7 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
             self.condition_name = self.condition[index]
             print(index, self.condition[index])
 
-            self.sendCondition("0156", self.condition[index], index, 0) # 1 : 실시간 조건검색식 종목 조회, 0 : 일회성 조회
+            self.sendCondition("0156", self.condition[index], index, 1) # 1 : 실시간 조건검색식 종목 조회, 0 : 일회성 조회
         except Exception as e:
             print("조건 검색 Error: ", e)
 
@@ -3262,94 +3261,164 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             if port_code not in self.매도할종목:
                 self.매도할종목.append(port_code)
 
-        # google spreadsheet 매매이력 생성
-        def save_history(self, code, status):
-            # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+    # google spreadsheet 매매이력 생성
+    def save_history(self, code, status):
+        # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+        try:
+            code_row = condition_history_sheet.findall(self.portfolio[code].종목명)[
+                -1].row  # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
+            cell = alpha_list[condition_history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
+            sell_price = condition_history_sheet.acell(str(cell)).value
+
+            # 매도 이력은 추가 매도(매도전략5의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
+            if status == '매도':  # 포트폴리오 데이터 사용
+                cell = alpha_list[condition_history_cols.index('매도가')] + str(code_row)
+                condition_history_sheet.update_acell(cell, self.portfolio[code].매도가)
+
+                cell = alpha_list[condition_history_cols.index('매도일')] + str(code_row)
+                condition_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+
+            # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
+            if sell_price == '':
+                if status == '매수':  # 포트폴리오 데이터 사용
+                    cell = alpha_list[condition_history_cols.index('매수가')] + str(code_row)
+                    condition_history_sheet.update_acell(cell, self.portfolio[code].매수가)
+
+                    cell = alpha_list[condition_history_cols.index('매수일')] + str(code_row)
+                    condition_history_sheet.update_acell(cell, self.portfolio[code].매수일)
+
+            else:  # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함
+                raise Exception('매매완료 종목')
+
+        except:
+            row = []
             try:
-                code_row = condition_history_sheet.findall(self.portfolio[code].종목명)[
-                    -1].row  # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
-                cell = alpha_list[condition_history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
-                sell_price = condition_history_sheet.acell(str(cell)).value
+                if status == '매수':
+                    row.append(self.portfolio[code].종목명)
+                    row.append(self.portfolio[code].매수가)
+                    row.append(self.portfolio[code].매수일)
 
-                # 매도 이력은 추가 매도(매도전략5의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
-                if status == '매도':  # 포트폴리오 데이터 사용
-                    cell = alpha_list[condition_history_cols.index('매도가')] + str(code_row)
-                    condition_history_sheet.update_acell(cell, self.portfolio[code].매도가)
+                condition_history_sheet.append_row(row)
 
-                    cell = alpha_list[condition_history_cols.index('매도일')] + str(code_row)
-                    condition_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+            except Exception as e:
+                print('CTradeCondition_save_history Error :', e)
+                Telegram('[XTrader]CTradeCondition_save_history Error : %s' % e, send='mc')
+                logger.error('CTradeCondition_save_history Error : %s' % e)
 
-                # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
-                if sell_price == '':
-                    if status == '매수':  # 포트폴리오 데이터 사용
-                        cell = alpha_list[condition_history_cols.index('매수가')] + str(code_row)
-                        condition_history_sheet.update_acell(cell, self.portfolio[code].매수가)
+    # 매도 전략
+    def sell_strategy(self, code, price):
+        result = False
+        sell_price = 0
 
-                        cell = alpha_list[condition_history_cols.index('매수일')] + str(code_row)
-                        condition_history_sheet.update_acell(cell, self.portfolio[code].매수일)
+        현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
+        매수가 = self.portfolio[code].매수가
 
-                else:  # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함
-                    raise Exception('매매완료 종목')
-
-            except:
-                row = []
-                try:
-                    if status == '매수':
-                        row.append(self.portfolio[code].종목명)
-                        row.append(self.portfolio[code].매수가)
-                        row.append(self.portfolio[code].매수일)
-
-                    condition_history_sheet.append_row(row)
-
-                except Exception as e:
-                    print('CTradeCondition_save_history Error :', e)
-                    Telegram('[XTrader]CTradeCondition_save_history Error : %s' % e, send='mc')
-                    logger.error('CTradeCondition_save_history Error : %s' % e)
-
-        # 매도 전략
-        def sell_strategy(self, code, price):
-            result = False
-            sell_price = 0
-
-            현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
-            매수가 = self.portfolio[code].매수가
-
-            # 1. 보유일 제한 매도 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
-            보유기간 = holdingcal(self.portfolio[code].매수일)
-            if 보유기간 - 1 >= int(self.portfolio[code].보유일):
-                result = True
-                sell_price = 전일종가
-                return result, sell_price
-
-            # 2. 익절 매도 전략
-            if 현재가 >= 매수가 * (1 + (abs(self.익절) / 100)):
-                result = True
-                sell_price = 현재가
-
-            # 3. 손절 매도 전략
-            elif 현재가 <= 매수가 * (1 - (abs(self.손절) / 100)):
-                result = True
-                sell_price = 현재가
-
+        # 1. 보유일 제한 매도 전략 : 보유기간이 보유일 이상일 경우 전량 매도 실행
+        보유기간 = holdingcal(self.portfolio[code].매수일)
+        if 보유기간 - 1 >= int(self.portfolio[code].보유일):
+            result = True
+            sell_price = 전일종가
             return result, sell_price
+
+        # 2. 익절 매도 전략
+        if 현재가 >= 매수가 * (1 + (abs(self.익절) / 100)):
+            result = True
+            sell_price = 현재가
+
+        # 3. 손절 매도 전략
+        elif 현재가 <= 매수가 * (1 - (abs(self.손절) / 100)):
+            result = True
+            sell_price = 현재가
+
+        return result, sell_price
 
     # 조건 검색 관련 ActiveX와 On시리즈와 붙임(콜백)
     def KiwoomConnect(self):
         print("CTradeCondition : KiwoomConnect")
         self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
-        # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
+        self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
         self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
     # 조건 검색 관련 ActiveX와 On시리즈 연결 해제
     def KiwoomDisConnect(self):
         print("CTradeCondition : KiwoomDisConnect")
         self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].disconnect(self.OnReceiveTrCondition)
-        # self.kiwoom.OnReceiveConditionVer[int, str].disconnect(self.OnReceiveConditionVer)
+        self.kiwoom.OnReceiveConditionVer[int, str].disconnect(self.OnReceiveConditionVer)
         self.kiwoom.OnReceiveRealCondition[str, str, str, str].disconnect(self.OnReceiveRealCondition)
+
+    # 저장된 조건 검색식 목록 읽음
+    def GetCondition(self):
+        # 1. 저장된 조건 검색식 목록 불러옴 GetCondition
+        # 2. 조건식 목록 요청 getConditionLoad
+        # 3. 목록 요청 응답 이벤트 OnReceiveConditionVer에서
+        #    getConditionNameList로 목록을 딕셔너리로 self.condition에 받음
+        # 4. GetCondition에서 self.condition을 정리해서 콤보박스에 목록 추가함
+        try:
+            # print("화면_TradeCondition : GetCondition")
+            self.getConditionLoad()
+
+            self.df_condition = DataFrame()
+            self.idx = []
+            self.conName = []
+
+            for index in self.condition.keys():  # condition은 dictionary
+                # print(self.condition)
+
+                self.idx.append(str(index))
+                self.conName.append(self.condition[index])
+
+                # self.sendCondition("0156", self.condition[index], index, 1)
+
+            self.df_condition['Index'] = self.idx
+            self.df_condition['Name'] = self.conName
+            self.df_condition['Table'] = ">> 조건식 " + self.df_condition['Index'] + " : " + self.df_condition['Name']
+            self.df_condition['Index'] = self.df_condition['Index'].astype(int)
+            self.df_condition = self.df_condition.sort_values(by='Index').reset_index(drop=True)  # 추가
+
+            print(self.df_condition)  # 추가
+
+
+        except Exception as e:
+            print("GetCondition_Error")
+            print(e)
+
+    # 조건식 목록 요청 메서드
+    def getConditionLoad(self):
+        """ 조건식 목록 요청 메서드 """
+        # print("화면_TradeCondition : getConditionLoad")
+        self.kiwoom.dynamicCall("GetConditionLoad()")
+
+        # OnReceiveConditionVer() 이벤트 메서드에서 루프 종료
+        self.conditionLoop = QEventLoop()
+        self.conditionLoop.exec_()
+
+    # 조건식 목록 획득 메서드(조건식 목록을 딕셔너리로 리턴)
+    def getConditionNameList(self):
+        """
+        조건식 획득 메서드
+
+        조건식을 딕셔너리 형태로 반환합니다.
+        이 메서드는 반드시 receiveConditionVer() 이벤트 메서드안에서 사용해야 합니다.
+
+        :return: dict - {인덱스:조건명, 인덱스:조건명, ...}
+        """
+        # print("화면_TradeCondition : getConditionNameList")
+        data = self.kiwoom.dynamicCall("GetConditionNameList()")
+
+        conditionList = data.split(';')
+        del conditionList[-1]
+
+        conditionDictionary = {}
+
+        for condition in conditionList:
+            key, value = condition.split('^')
+            conditionDictionary[int(key)] = value
+
+        return conditionDictionary
 
     # 조건검색 해당 종목 요청 메서드
     def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
-        print("CTradeCondition : sendCondition")
+        print("CTradeCondition : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
         """
         종목 조건검색 요청 메서드
 
@@ -3369,6 +3438,48 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         """
         isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int",
                                             screenNo, conditionName, conditionIndex, isRealTime)
+
+    # 조건식 목록 요청에 대한 응답 이벤트
+    def OnReceiveConditionVer(self, lRet, sMsg):
+        logger.debug('main:OnReceiveConditionVer : [이벤트] 조건식 저장 [%s] [%s]' % (lRet, sMsg))
+        # print("화면_TradeCondition : OnReceiveConditionVer")
+        """
+        getConditionLoad() 메서드의 조건식 목록 요청에 대한 응답 이벤트
+
+        :param receive: int - 응답결과(1: 성공, 나머지 실패)
+        :param msg: string - 메세지
+        """
+
+        try:
+            self.condition = self.getConditionNameList()  # condition이 리턴되서 오면 GetCondition에서 condition 변수 사용 가능
+            # print("조건식 개수: ", len(self.condition))
+
+            # for key in self.condition.keys():
+            # print("조건식: ", key, ": ", self.condition[key])
+
+        except Exception as e:
+            print("OnReceiveConditionVer_Error")
+
+        finally:
+            self.conditionLoop.exit()
+
+        # print(self.conditionName)
+        # self.kiwoom.dynamicCall("SendCondition(QString,QString, int, int)", '0156', '갭상승', 0, 0)
+
+    # 조건검색 세부 종목 조회 요청시 발생되는 이벤트
+    def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
+        logger.debug('CTradeCondition:OnReceiveTrCondition [%s] [%s] [%s] [%s] [%s]' % (
+        sScrNo, strCodeList, strConditionName, nIndex, nNext))
+        # print("화면_TradeCondition : OnReceiveTrCondition")
+        """
+        (1회성, 실시간) 종목 조건검색 요청시 발생되는 이벤트
+        :param screenNo: string
+        :param codes: string - 종목코드 목록(각 종목은 세미콜론으로 구분됨)
+        :param conditionName: string - 조건식 이름
+        :param conditionIndex: int - 조건식 인덱스
+        :param inquiry: int - 조회구분(0: 남은데이터 없음, 2: 남은데이터 있음)
+        """
+
 
     # 실시간 종목 조건검색 요청시 발생되는 이벤트
     def OnReceiveRealCondition(self, sTrCode, strType, strConditionName, strConditionIndex):
@@ -3568,7 +3679,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 print("조건식 인덱스 : ", self.조건식인덱스, type(self.조건식인덱스))
                 print("조건식명 : ", self.조건식명)
 
-                self.초기조건() # 매도할 종목 리스트 저장
+                # self.초기조건() # 매도할 종목 리스트 저장
 
                 self.투자총액 = floor(int(d2deposit.replace(",", "")) * (self.투자금비중 / 100))
 
@@ -3583,8 +3694,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 # self.실시간종목리스트 = self.매도할종목 + self.매수할종목
                 # logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
-
-                self.sendCondition("0156", self.조건식명, self.조건식인덱스, 1)  # 1 : 실시간 조건검색식 종목 조회, 0 : 일회성 조회
+                self.GetCondition()
+                self.sendCondition("0156", self.조건식명, int(self.조건식인덱스), 0)  # 1 : 실시간 조건검색식 종목 조회, 0 : 일회성 조회
 
                 if len(self.매도할종목) > 0:
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.매도할종목) + ';')
@@ -4552,7 +4663,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        if current_time > '08:59:00' and current_time <= '15:24:00':
+        if current_time > '08:59:00' and current_time <= '10:30:00':
             #if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
             if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
@@ -4754,11 +4865,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.kiwoom.OnEventConnect[int].connect(
             self.OnEventConnect)  # 키움의 OnEventConnect와 이 프로그램의 OnEventConnect 함수와 연결시킴
         self.kiwoom.OnReceiveMsg[str, str, str, str].connect(self.OnReceiveMsg)
-        # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
         self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].connect(self.OnReceiveTrData)
         self.kiwoom.OnReceiveChejanData[str, int, str].connect(self.OnReceiveChejanData)
-        # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
-        # self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
+        self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
+        self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
+        self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
         self.kiwoom.OnReceiveRealData[str, str, str].connect(self.OnReceiveRealData)
 
     # ActiveX와 On시리즈 연결 해제
@@ -4766,11 +4877,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print('MainWindow KiwoomDisConnect')
         self.kiwoom.OnEventConnect[int].disconnect(self.OnEventConnect)
         self.kiwoom.OnReceiveMsg[str, str, str, str].disconnect(self.OnReceiveMsg)
-        # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].disconnect(self.OnReceiveTrCondition)
-        # self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].disconnect(self.OnReceiveTrData)
+        self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].disconnect(self.OnReceiveTrCondition)
+        self.kiwoom.OnReceiveTrData[str, str, str, str, str, int, str, str, str].disconnect(self.OnReceiveTrData)
         self.kiwoom.OnReceiveChejanData[str, int, str].disconnect(self.OnReceiveChejanData)
-        # self.kiwoom.OnReceiveConditionVer[int, str].disconnect(self.OnReceiveConditionVer)
-        # self.kiwoom.OnReceiveRealCondition[str, str, str, str].disconnect(self.OnReceiveRealCondition)
+        self.kiwoom.OnReceiveConditionVer[int, str].disconnect(self.OnReceiveConditionVer)
+        self.kiwoom.OnReceiveRealCondition[str, str, str, str].disconnect(self.OnReceiveRealCondition)
         self.kiwoom.OnReceiveRealData[str, str, str].disconnect(self.OnReceiveRealData)
 
     # 키움 로그인
