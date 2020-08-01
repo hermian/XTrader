@@ -59,6 +59,7 @@ spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1XE4sk0vDw4fE88bYMDZuJ
 doc = gc.open_by_url(spreadsheet_url)
 shortterm_buy_sheet = doc.worksheet('매수모니터링')
 shortterm_sell_sheet = doc.worksheet('매도모니터링')
+shortterm_strategy_sheet = doc.worksheet('ST bot')
 shortterm_history_sheet = doc.worksheet('매매이력')
 
 shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
@@ -150,15 +151,17 @@ def import_googlesheet():
         if len(row_data) > 1:
             for row in row_data[1:]:
                 try:
+                    code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
                     if row[idx_holding] == '' : raise Exception('보유일 오류')
                     if row[idx_strategy] == '': raise Exception('매도전략 오류')
-                    if row[idx_sellprice] == '': raise Exception('매도가 오류')
+                    if row[idx_strategy] == '4' and row[idx_sellprice] == '': raise Exception('매도가 오류')
                 except Exception as e:
+                    if str(e) != '보유일 오류' and str(e) != '매도전략 오류' and str(e) != '매도가 오류': e = '종목명 오류'
                     print('구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
                     logger.error('구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
                     Telegram('[XTrader]구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
 
-        print(data)
+        # print(data)
         print('[XTrader]구글 시트 확인 완료')
         # Telegram('[XTrader]구글 시트 확인 완료')
         # logger.info('[XTrader]구글 시트 확인 완료')
@@ -315,13 +318,12 @@ class PandasModel(QtCore.QAbstractTableModel):
 # 포트폴리오에 사용되는 주식정보 클래스
 # TradeShortTerm용 포트폴리오
 class CPortStock_ShortTerm(object):
-    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
+    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
         self.번호 = 번호
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.시장 = 시장
-        self.매수전략 = 매수전략
         self.매수가 = 매수가
         self.매수조건 = 매수조건
         self.보유일 = 보유일
@@ -1578,6 +1580,124 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         self.d = today
 
+    # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
+    def set_stocklist(self, data):
+        self.Stocklist = dict()
+        self.Stocklist['컬럼명'] = list(data.columns)
+        for 종목코드 in data['종목코드'].unique():
+            temp_list = data[data['종목코드'] == 종목코드].values[0]
+            self.Stocklist[종목코드] = {
+                '번호': temp_list[self.Stocklist['컬럼명'].index('번호')],
+                '종목명': temp_list[self.Stocklist['컬럼명'].index('종목명')],
+                '종목코드': 종목코드,
+                '시장': temp_list[self.Stocklist['컬럼명'].index('시장')],
+                '투자비중': float(temp_list[self.Stocklist['컬럼명'].index('비중')]),  # 저장 후 setting 함수에서 전략의 단위투자금을 곱함
+                '시가위치': list(map(float, temp_list[self.Stocklist['컬럼명'].index('시가위치')].split(','))),
+                '매수가': list(
+                    int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
+                    '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
+                '매도전략': temp_list[self.Stocklist['컬럼명'].index('기본매도전략')],
+                '매도가': list(
+                    int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
+                    '목표가' in col and temp_list[list(data.columns).index(col)] != '')
+            }
+        return self.Stocklist
+
+    # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
+    def Setting(self, sScreenNo, 매수방법='00', 매도방법='03', 종목리스트=pd.DataFrame()):
+        try:
+            self.sScreenNo = sScreenNo
+            self.실시간종목리스트 = []
+            self.매수방법 = 매수방법
+            self.매도방법 = 매도방법
+            self.종목리스트 = 종목리스트
+
+            self.Stocklist = self.set_stocklist(self.종목리스트) # 번호, 종목명, 종목코드, 시장, 비중, 시가위치, 매수가, 매도전략, 매도가
+            self.Stocklist['전략'] = {
+                '단위투자금': '',
+                '모니터링종료시간': '',
+                '보유일' : '',
+                '투자금비중': '',
+                '매도구간별조건': [],
+                '전략매도가': [],
+            }
+
+            row_data = shortterm_strategy_sheet.get_all_values()
+
+            for data in row_data:
+                if data[0] == '단위투자금':
+                    self.Stocklist['전략']['단위투자금'] = int(data[1])
+                elif data[0] == '매수모니터링 종료시간':
+                    self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
+                elif data[0] == '보유일':
+                    self.Stocklist['전략']['보유일'] = int(data[1])
+                elif data[0] == '투자금 비중':
+                    self.Stocklist['전략']['투자금비중'] = float(data[1][:-1])
+                # elif data[0] == '손절율':
+                #     self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
+                # elif data[0] == '시가 위치':
+                #     self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
+                elif '구간' in data[0]:
+                    if data[0][-1] != '1' and data[0][-1] != '2':
+                        self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
+                elif '손절가' == data[0]:
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                elif '본전가' == data[0]:
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                elif '익절가' in data[0]:
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+
+            self.Stocklist['전략']['매도구간별조건'].insert(0, self.Stocklist['전략']['전략매도가'][0]) # 손절가
+            self.Stocklist['전략']['매도구간별조건'].insert(1, self.Stocklist['전략']['전략매도가'][1]) # 본전가
+
+            for code in self.Stocklist.keys():
+                if code == '컬럼명' or code == '전략':
+                    continue
+                else:
+                    self.Stocklist[code]['단위투자금'] = int(
+                        self.Stocklist[code]['투자비중'] * self.Stocklist['전략']['단위투자금'])
+                    self.Stocklist[code]['시가체크'] = False
+                    self.Stocklist[code]['매수상한도달'] = False
+                    self.Stocklist[code]['매수조건'] = 0
+                    if self.Stocklist[code]['매도전략'] == '4':
+                        self.Stocklist[code]['매도가'].append(self.Stocklist['전략']['전략매도가'])
+            print(self.Stocklist)
+
+        except Exception as e:
+            print('CTradeShortTerm_Setting Error :', e)
+            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_Setting Error : %s' % e)
+
+    # 수동 포트폴리오 생성
+    def manual_portfolio(self):
+        self.portfolio = dict()
+        self.Stocklist = {
+            '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
+                       '매수조건': 1, '수량': 310, '매도전략': '4', '매도가': [3700], '매수일': '2020/05/29 09:22:39'},
+
+            '297090': {'번호': '7.101', '종목명': '씨에스베어링', '종목코드': '297090', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5000],
+                       '매수조건': 3, '수량': 15, '매도전략': '2', '매도가': [], '매수일': '2020/06/03 09:12:15'},
+
+            '053610': {'번호': '6.154', '종목명': '프로텍', '종목코드': '053610', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [9500],
+                       '매수조건': 2, '수량': 26, '매도전략': '4', '매도가': [9900], '매수일': '2020/06/03 09:12:15'}
+        }
+
+        self.strategy = {'전략': {'단위투자금': 200000, '모니터링종료시간': '10:30:00', '보유일': 20,
+                                '투자금비중': 70.0, '매도구간별조건': [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0], '전략매도가': [-2.7, 0.3, 3.0, 6.0]}}
+
+        for code in list(self.Stocklist.keys()):
+            self.portfolio[code] = CPortStock_ShortTerm(번호=self.Stocklist[code]['번호'], 종목코드=code,
+                                                        종목명=self.Stocklist[code]['종목명'],
+                                                        시장=self.Stocklist[code]['시장'],
+                                                        매수가=self.Stocklist[code]['매수가'][0],
+                                                        매수조건=self.Stocklist[code]['매수조건'],
+                                                        보유일=self.strategy['전략']['보유일'],
+                                                        매도전략=self.Stocklist[code]['매도전략'],
+                                                        매도가=self.Stocklist[code]['매도가'],
+                                                        매도구간별조건=self.strategy['전략']['매도구간별조건'], 매도구간=1,
+                                                        수량=self.Stocklist[code]['수량'],
+                                                        매수일=self.Stocklist[code]['매수일'])
+
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
         # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
@@ -1919,38 +2039,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             except Exception as e:
                 print("hold_strategy Error :", e)
 
-    # 구글 스프레드시트에서 읽은 DataFrame에서 로봇별 종목리스트 셋팅
-    def set_stocklist(self, data):
-        self.Stocklist = dict()
-        self.Stocklist['컬럼명'] = list(data.columns)
-        for 종목코드 in data['종목코드'].unique():
-            temp_list = data[data['종목코드'] == 종목코드].values[0]
-            self.Stocklist[종목코드] = {
-                '번호': temp_list[self.Stocklist['컬럼명'].index('번호')],
-                '종목명': temp_list[self.Stocklist['컬럼명'].index('종목명')],
-                '종목코드': 종목코드,
-                '시장': temp_list[self.Stocklist['컬럼명'].index('시장')],
-                '투자비중': float(temp_list[self.Stocklist['컬럼명'].index('비중')]),  # 저장 후 setting 함수에서 전략의 단위투자금을 곱함
-                '보유일': int(temp_list[self.Stocklist['컬럼명'].index('보유일')]),
-                '매수전략': temp_list[self.Stocklist['컬럼명'].index('매수전략')],
-                '시가위치': list(map(float, temp_list[self.Stocklist['컬럼명'].index('시가위치')].split(','))),
-                '매수가': list(int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
-                    '매수가' in col and temp_list[list(data.columns).index(col)] != ''),
-                '매도전략': temp_list[self.Stocklist['컬럼명'].index('매도전략')],
-                '매도가': list(int(float(temp_list[list(data.columns).index(col)].replace(',', ''))) for col in data.columns if
-                    '매도가' in col and temp_list[list(data.columns).index(col)] != '')
-            }
-        return self.Stocklist
-
     # 포트폴리오 생성
     def set_portfolio(self, code, buyprice, condition):
         try:
-            self.portfolio[code] = CPortStock_ShortTerm(번호=self.Stocklist[code]['번호'], 종목코드=code, 종목명=self.Stocklist[code]['종목명'], 시장=self.Stocklist[code]['시장'],
-                                              매수전략=self.Stocklist[code]['매수전략'], 매수가=buyprice,
-                                              매수조건=condition, 보유일=self.Stocklist[code]['보유일'],
-                                              매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
-                                              매도구간별조건=self.Stocklist['전략']['매도구간별조건'],
-                                              매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+            self.portfolio[code] = CPortStock_ShortTerm(번호=self.Stocklist[code]['번호'], 종목코드=code, 종목명=self.Stocklist[code]['종목명'],
+                                                        시장=self.Stocklist[code]['시장'], 매수가=buyprice,
+                                                        매수조건=condition, 보유일=self.Stocklist[code]['보유일'],
+                                                        매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
+                                                        매도구간별조건=self.Stocklist['전략']['매도구간별조건'],
+                                                        매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
 
             self.Stocklist[code]['매수일'] = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S') # 매매이력 업데이트를 위해 매수일 추가
 
@@ -1958,67 +2055,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print('CTradeShortTerm_set_portfolio Error ', e)
             Telegram('[XTrader]CTradeShortTerm_set_portfolio Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_set_portfolio Error : %s' % e)
-
-    # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
-    def Setting(self, sScreenNo, 매수방법='00',매도방법='03', 종목리스트=pd.DataFrame()):
-        try:
-            self.sScreenNo = sScreenNo
-            self.실시간종목리스트 = []
-            self.매수방법 = 매수방법
-            self.매도방법 = 매도방법
-            self.종목리스트 = 종목리스트
-
-            self.Stocklist = self.set_stocklist(self.종목리스트)
-            self.Stocklist['전략'] = {
-                '단위투자금': '',
-                '모니터링종료시간': '',
-                '투자금비중': '',
-                '매도구간별조건': [],
-                '전략매도가' : [],
-                '시세조회단위': []
-            }
-
-            strategy_sheet = doc.worksheet('ST bot')
-            row_data = strategy_sheet.get_all_values()
-
-            for data in row_data:
-                if data[0] == '단위투자금':
-                    self.Stocklist['전략']['단위투자금'] = int(data[1])
-                elif data[0] == '매수모니터링 종료시간':
-                    self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
-                # elif data[0] == '보유일':
-                #     self.Stocklist['전략']['보유일'] = int(data[1])
-                elif data[0] == '투자금 비중':
-                    self.Stocklist['전략']['투자금비중'] = float(data[1][:-1])
-                elif data[0] == '손절율':
-                    self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
-                # elif data[0] == '시가 위치':
-                #     self.Stocklist['전략']['시가위치'] = list(map(int, data[1].split(',')))
-                elif '구간' in data[0]:
-                    self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
-                elif '손절가' == data[0]:
-                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
-                elif '익절가' in data[0]:
-                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
-                elif ('일봉' in data[0]) or ('주봉' in data[0]) or ('월봉' in data[0]):
-                    self.Stocklist['전략']['시세조회단위'].append(int(data[1]))
-
-            self.Stocklist['전략']['매도구간별조건'].insert(1, 0.3)
-            # self.단위투자금 = self.Stocklist['전략']['단위투자금']
-            for code in self.Stocklist.keys():
-                if code == '컬럼명' or code == '전략': continue
-                else:
-                    self.Stocklist[code]['단위투자금'] = int(self.Stocklist[code]['투자비중'] * self.Stocklist['전략']['단위투자금'])
-                    self.Stocklist[code]['시가체크'] = False
-                    self.Stocklist[code]['매수상한도달'] = False
-                    self.Stocklist[code]['매수조건'] = 0
-                    if self.Stocklist[code]['매도전략'] == '4':
-                        self.Stocklist[code]['매도가'].append(self.Stocklist['전략']['전략매도가'])
-            print(self.Stocklist)
-        except Exception as e:
-            print('CTradeShortTerm_Setting Error :', e)
-            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
-            logger.error('CTradeShortTerm_Setting Error : %s' % e)
 
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
     def 초기조건(self, codes):
@@ -2036,8 +2072,23 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         for code in codes: # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
             self.매수할종목.append(code)
-            
-        for port_code in list(self.portfolio.keys()): # 포트폴리오에 있는 종목은 '매도할종목'에 추가
+
+        if len(self.portfolio) > 0: # 포트폴리오에 있는 종목은 매도 관련 전략 재확인(구글시트) 및 '매도할종목'에 추가
+            row_data = shortterm_sell_sheet.get_all_values()
+            idx_holding = row_data[0].index('보유일')
+            idx_strategy = row_data[0].index('매도전략')
+            idx_sellprice = row_data[0].index('매도가')
+            for row in row_data[1:]:
+                code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
+                self.portfolio[code].보유일 = row[idx_holding]
+                self.portfolio[code].매도전략 = row[idx_strategy]
+                self.portfolio[code].매도가 = []
+                if self.portfolio[code].매도전략 == '4':
+                    self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
+                    self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
+
+
+        for port_code in list(self.portfolio.keys()):
             # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
             # 구간이 내려가는 건 반영하지 않으므로 초기화를 시켜서 다시 구간 체크 시작하기 위함
             self.portfolio[port_code].매도구간 = 1 # 매도 구간은 로봇 실행 시 마다 초기화시킴
@@ -2054,7 +2105,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     '종목명': self.portfolio[port_code].종목명,
                     '종목코드': self.portfolio[port_code].종목코드,
                     '시장': self.portfolio[port_code].시장,
-                    '매수전략': self.portfolio[port_code].매수전략,
+                    '매수조건': self.portfolio[port_code].매수조건,
                     '매수가': self.portfolio[port_code].매수가,
                     '매도전략': self.portfolio[port_code].매도전략,
                     '매도가': self.portfolio[port_code].매도가
@@ -2253,10 +2304,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
         ret = 0
+        # self.manual_portfolio()
+        for code in list(self.portfolio.keys()):
+            print('종목명 : %s, 보유일 : %s, 매도전략 : %s, 매도가 : %s'%(self.portfolio[code].종목명, self.portfolio[code].보유일, self.portfolio[code].매도전략, self.portfolio[code].매도가))
 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
-
             try:
                 Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
 
@@ -2284,6 +2337,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 print("매도 : ", self.매도할종목)
                 print("매수 : ", self.매수할종목)
                 print("매수총액 : ", self.매수총액)
+
+                print("포트폴리오 매도모니터링 수정")
+                for code in list(self.portfolio.keys()):
+                    print('종목명 : %s, 보유일 : %s, 매도전략 : %s, 매도가 : %s' % (
+                    self.portfolio[code].종목명, self.portfolio[code].보유일, self.portfolio[code].매도전략,
+                    self.portfolio[code].매도가))
 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
