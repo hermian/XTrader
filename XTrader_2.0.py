@@ -1955,33 +1955,34 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             else:
                 매도방법 = '00'
                 try:
+                    # 전략 4의 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                     # 1. 매수 후 손절가까지 하락시 매도주문 -> 손절가, 전량매도로 끝
                     if 현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][0] / 100):
                         self.portfolio[code].매도구간 = 0
                         result = True
                         qty_ratio = 1
                     # 2. 1차익절가 도달시 매도주문 -> 1차익절가, 1/3 매도
-                    elif self.portfolio[code].익절가1도달 == False and 현재가 >= 매수가 * (1 + self.portfolio[code].매도가[1][1] / 100):
+                    elif self.portfolio[code].익절가1도달 == False and 현재가 >= 매수가 * (1 + self.portfolio[code].매도가[1][2] / 100):
                         self.portfolio[code].매도구간 = 1
                         self.portfolio[code].익절가1도달 = True
                         result = True
                         if self.portfolio[code].수량 == 1:qty_ratio = 1
                         elif self.portfolio[code].수량 == 2:qty_ratio = 0.5
                         else:qty_ratio = 0.3
-                    # 3. 2차익절가 도달못하고 1차익절가까지 하락시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
-                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][1] / 100):
+                    # 3. 2차익절가 도달못하고 본전가까지 하락 또는 고가 -3%까지시 매도주문 -> 1차익절가, 나머지 전량 매도로 끝
+                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and ((현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][1] / 100)) or (현재가 <= 고가 * 0.97)):
                         self.portfolio[code].매도구간 = 1.5
                         result = True
                         qty_ratio = 1
                     # 4. 2차 익절가 도달 시 매도주문 -> 2차 익절가, 1/3 매도
-                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 >= 매수가 * (1 + self.portfolio[code].매도가[1][2] / 100):
+                    elif self.portfolio[code].익절가1도달 == True and self.portfolio[code].익절가2도달 == False and 현재가 >= 매수가 * (1 + self.portfolio[code].매도가[1][3] / 100):
                         self.portfolio[code].매도구간 = 2
                         self.portfolio[code].익절가2도달 = True
                         result = True
                         if self.portfolio[code].수량 == 1:qty_ratio = 1
                         else:qty_ratio = 0.5
                     # 5. 목표가 도달못하고 2차익절가까지 하락 시 매도주문 -> 2차익절가, 나머지 전량 매도로 끝
-                    elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and 현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][2] / 100):
+                    elif self.portfolio[code].익절가2도달 == True and self.portfolio[code].목표가도달 == False and ((현재가 <= 매수가 * (1 + self.portfolio[code].매도가[1][2] / 100)) or (현재가 <= 고가 * 0.97)):
                         self.portfolio[code].매도구간 = 2.5
                         result = True
                         qty_ratio = 1
