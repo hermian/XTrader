@@ -1544,12 +1544,8 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
         try:
             self.data = import_googlesheet()
             print(self.data)
-            if '_' in self.lineEdit_name.text():
-                strategy = self.lineEdit_name.text().split('_')[0]
-                self.data = self.data[self.data['매수전략'] == strategy]
 
             self.model.update(self.data)
-
             for i in range(len(self.data)):
                 self.tableView.resizeColumnToContents(i)
 
@@ -1575,6 +1571,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.portfolio = dict()
 
         self.실시간종목리스트 = []
+        self.매수모니터링체크 = False
 
         self.SmallScreenNumber = 9999
 
@@ -1659,6 +1656,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.Stocklist[code]['시가체크'] = False
                     self.Stocklist[code]['매수상한도달'] = False
                     self.Stocklist[code]['매수조건'] = 0
+                    self.Stocklist[code]['매수총수량'] = 0 # 분할매수에 따른 수량체크
+                    self.Stocklist[code]['매수수량'] = 0   # 분할매수 단위
+                    self.Stocklist[code]['매수주문완료'] = 0   # 분할매수에 따른 매수 주문 수
+                    self.Stocklist[code]['매수가전략'] = len(self.Stocklist[code]['매수가']) # 매수 전략에 따른 매수가 지정 수량
                     if self.Stocklist[code]['매도전략'] == '4':
                         self.Stocklist[code]['매도가'].append(self.Stocklist['전략']['전략매도가'])
             print(self.Stocklist)
@@ -1775,75 +1776,71 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def buy_strategy(self, code, price):
         result = False
         condition = self.Stocklist[code]['매수조건']  # 초기값 0
+        qty = 0 # 매수수량
 
-        strategy = self.Stocklist[code]['매수전략']
+        # strategy = self.Stocklist[code]['매수전략']
         현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
-        if strategy == '10':
-            매수가 = self.Stocklist[code]['매수가']  # [매수가1, 매수가2, 매수가3]
-            시가위치하한 = self.Stocklist[code]['시가위치'][0]
-            시가위치상한 = self.Stocklist[code]['시가위치'][1]
 
-            if self.Stocklist[code]['시가체크'] == False:  # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
-                매수가.append(시가)
-                매수가.sort(reverse=True)
-                band = 매수가.index(시가)
-                매수가.remove(시가)
+        매수가 = self.Stocklist[code]['매수가']  # [매수가1, 매수가2, 매수가3]
+        시가위치하한 = self.Stocklist[code]['시가위치'][0]
+        시가위치상한 = self.Stocklist[code]['시가위치'][1]
 
-                if band == len(매수가):  # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
-                    return result, condition
-                else:
-                    if band == 0:  # 시가가 매수가1보다 높은 경우
-                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가 and 시가 <= 매수가[band] * (
-                                1 + 시가위치상한 / 100):  # 시가위치보다 높을 경우 조건 1, 매수가1에 매수
-                            condition = 1
-                        else:  # 시가 위치에에미포함
-                            if len(매수가) == 1:  # 매수가2가 미설정이므로 매수 불만족리턴
-                                condition = 0
-                                self.Stocklist[code]['매수조건'] = condition
-                                return result, condition
-                            else:  # 시가가 매수가1보다 높으나 시가 위치 미포함, 매수가2에 매수
-                                condition = 2
-                    else:  # 시가가 매수가1보다 낮은 경우
-                        if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가:  # 중간 위치에서 매수가2나 3의 1% 이상의 위치일때 해당 매수가에서 매수
-                            condition = band + 1
-                        elif len(매수가) - 1 > band:  # 1% 미만인 경우 다음 구간의 매수가 설정값이 있는 경우
-                            condition = band + 2
-                        else:  # 1% 미만인 경우 다음 구간의 매수가 미설정이므로 매수 불만족리턴
-                            condition = 0
-                            self.Stocklist[code]['매수조건'] = condition
-                            return result, condition
+        # 1. 금일시가 위치 체크(초기 한번)하여 매수조건(1~6)과 주문 수량 계산
+        if self.Stocklist[code]['시가체크'] == False:  # 종목별로 초기에 한번만 시가 위치 체크를 하면 되므로 별도 함수 미사용
+            매수가.append(시가)
+            매수가.sort(reverse=True)
+            band = 매수가.index(시가) # band = 0 : 매수가1 이상, band=1: 매수가1, 2 사이, band=2: 매수가2,3 사이
+            매수가.remove(시가)
 
-                self.Stocklist[code]['시가체크'] = True
-                self.Stocklist[code]['매수조건'] = condition
-            else:  # 시가 위치 체크를 한 두번째 데이터 이후에는 condition이 0이면 바로 매수 불만족리턴시킴
-                if condition == 0:  # condition 0은 매수 조건 불만족
-                    result = False  # 매수 불만족리턴
-                    return result, condition
+            if band == len(매수가):  # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
+                return result, condition
+            else:
+                self.Stocklist[code]['매수총수량'] = self.Stocklist[code]['단위투자금'] // 매수가[band]
+                if band == 0:  # 시가가 매수가1보다 높은 경우
+                    # 시가가 매수가1의 시가범위에 포함 : 조건 1, 2, 3
+                    if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가 and 시가 <= 매수가[band] * (1 + 시가위치상한 / 100):
+                        condition = len(매수가)
+                        self.Stocklist[code]['매수수량'] = self.Stocklist[code]['매수총수량'] // condition
+                    # 매수 조건 1일 경우 시가위치 상한 이상으로 오르면 매수상한도달을 True로 해서 매수하지 않게 함
+                    elif 현재가 > 매수가[band] * (1 + 시가위치상한 / 100):
+                        self.Stocklist[code]['매수상한도달'] = True
+                    else:  # 시가 위치에 미포함
+                        condition = 0
+                        self.Stocklist[code]['매수조건'] = condition
+                        return result, condition, qty
+                else: # 시가가 매수가 중간인 경우 - 매수가1&2사이(band 1) : 조건 4,5 / 매수가2&3사이(band 2) : 조건 6
+                    if 매수가[band] * (1 + 시가위치하한 / 100) <= 시가:  # 시가범위 포함
+                        condition = len(매수가) + band + 1
+                        self.Stocklist[code]['매수수량'] = self.Stocklist[code]['매수총수량'] // (condition % 2 + 1)
+                    else:
+                        condition = 0
+                        self.Stocklist[code]['매수조건'] = condition
+                        return result, condition, qty
 
-            # 매수 조건 1일 경우 시가위치 상한 이상으로 오르면 매수상한도달을 True로 해서 매수하지 않게 함
-            # 매수 조건 2일 경우는 매수가1 도달 시, 매수 조건 3일 경우는 매수가2 도달 시 매수상한도달을 True로 함
-            # 20.07.02 변경 : 상한 제한은 시가위치상한값으로 통일함
-            # if condition == 1 and 현재가 > 매수가[condition-1] * (1 + 시가위치상한 / 100):
-            #     self.Stocklist[code]['매수상한도달'] = True
-            # elif condition != 1 and 현재가 > 매수가[condition-2]:
-            #     self.Stocklist[code]['매수상한도달'] = True
-            if 현재가 > 매수가[condition - 1] * (1 + 시가위치상한 / 100):
-                self.Stocklist[code]['매수상한도달'] = True
+            self.Stocklist[code]['시가체크'] = True
+            self.Stocklist[code]['매수조건'] = condition
 
-            # 매수상한에 미도달한 상태로 매수가로 내려왔을 때 매수
-            if self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[condition - 1]:  # 현재가가 설정 매수가에 도달했을 경우 매수
-                result = True
+        else:  # 시가 위치 체크를 한 두번째 데이터 이후에는 condition이 0이면 바로 매수 불만족 리턴시킴
+            if condition == 0:  # condition 0은 매수 조건 불만족
+                result = False  # 매수 불만족리턴
+                return result, condition, qty
 
-        elif strategy == '5':
-            pass
-
-        elif strategy == '3':
-            pass
+        # 매수조건 확정, 매수 수량 계산 완료
+        # 매수상한에 미도달한 상태로 매수가로 내려왔을 때 매수
+        if self.Stocklist[code]['매수주문완료'] < len(self.Stocklist[code]['매수가전략']) and self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[0]:
+            result = True
+            매수가.pop(0)
+            self.Stocklist[code]['매수주문완료'] += 1
 
         # 매수 상한에 도달한 종목은 매수 모니터링 중지를 위해 매수할종목리스트에서 삭제
         if self.Stocklist[code]['매수상한도달'] == True: self.매수할종목.remove(code)
-        return result, condition
+
+        qty = self.Stocklist[code]['매수수량']
+        print("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s"%(self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
+        logger.debug("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s" % (self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
+
+        return result, condition, qty
 
     # 매도 구간 확인
     def profit_band_check(self, 현재가, 매수가):
@@ -2153,22 +2150,30 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         # 매수총액 + 종목단위투자금이 투자총액보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
                         if (self.매수총액 + self.Stocklist[종목코드]['단위투자금'] < self.투자총액) and self.주문실행중_Lock.get('B_%s' % 종목코드) is None: # and self.portfolio.get(종목코드) is None
                             # 매수 전략별 모니터링 체크
-                            buy_check, condition = self.buy_strategy(종목코드, 시세)
+                            buy_check, condition, qty = self.buy_strategy(종목코드, 시세)
                             if buy_check == True and (self.Stocklist[종목코드]['단위투자금'] // 현재가 > 0):
-                                (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.Stocklist[종목코드]['단위투자금'])
+                                (result, order) = self.정량매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 수량=qty)
     
                                 if result == True:
                                     if self.portfolio.get(종목코드) is None:     # 포트폴리오에 없으면 신규 저장
                                         self.set_portfolio(종목코드, 현재가, condition)
 
                                     self.주문실행중_Lock['B_%s' % 종목코드] = True
-                                    Telegram('[XTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
-                                    logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                                    Telegram('[XTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (종목코드, 종목명, 현재가, condition, qty))
+                                    logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (종목코드, 종목명, 현재가, condition, qty))
     
                                 else:
                                     Telegram('[XTrader]매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                                     logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
-                    
+                else:
+                    if self.매수모니터링체크 == False:
+                        for code in self.매수할종목:
+                            if self.portfolio.get(code) is not None and code not in self.매도할종목:
+                                self.매수할종목.remove(code)
+                                self.매도할종목.append(code)
+
+                        self.매수모니터링체크 = True
+
                 # 매도 조건
                 if 종목코드 in self.매도할종목:
                     # 포트폴리오에 있음 and 매도주문실행중Lock에 없음 and 매수주문실행중Lock에 없음
@@ -2240,8 +2245,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if 미체결수량 == 0:
                     try:
                         self.주문실행중_Lock.pop(주문)
-                        self.매수할종목.remove(종목코드)
-                        self.매도할종목.append(종목코드)
+                        if self.Stocklist[종목코드]['매수주문완료'] == len(self.Stocklist[종목코드]['매수가전략']):
+                            self.매수할종목.remove(종목코드)
+                            self.매도할종목.append(종목코드)
 
                         self.Stocklist[종목코드]['수량'] = P.수량
 
