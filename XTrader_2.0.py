@@ -1702,6 +1702,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
         # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+
         try:
             code_row = shortterm_history_sheet.findall(self.portfolio[code].종목명)[-1].row # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
             cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
@@ -1752,7 +1753,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except:
             row = []
-
+            row_buy = []
             if status == '매수':
                 row.append(self.portfolio[code].번호)
                 row.append(self.portfolio[code].종목명)
