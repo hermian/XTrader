@@ -57,6 +57,7 @@ spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1XE4sk0vDw4fE88bYMDZuJ
 
 # spreadsheet 연결 및 worksheet setting
 doc = gc.open_by_url(spreadsheet_url)
+
 shortterm_buy_sheet = doc.worksheet('매수모니터링')
 shortterm_sell_sheet = doc.worksheet('매도모니터링')
 shortterm_strategy_sheet = doc.worksheet('ST bot')
@@ -1765,14 +1766,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
             shortterm_history_sheet.append_row(row)
 
-    # 시가 구간 확인(매수 전략 5, 3의 매수가 밴드)
-    def openprice_band_check(self, 시가, 매수가, 시가위치):
-        매수가.append(시가)
-        매수가.sort(reverse=True)
-        band = 매수가.index(시가)
-        매수가.remove(시가)
-        return band
-
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
         result = False
@@ -1795,7 +1788,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             매수가.remove(시가)
 
             if band == len(매수가):  # 매수가 지정한 구간보다 시가가 아래일 경우로 초기값이 result=False, condition=0 리턴
-                return result, condition
+                self.Stocklist[code]['시가체크'] = True
+                return result, condition, qty
             else:
                 self.Stocklist[code]['매수총수량'] = self.Stocklist[code]['단위투자금'] // 매수가[band]
                 if band == 0:  # 시가가 매수가1보다 높은 경우
@@ -1808,6 +1802,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.Stocklist[code]['매수상한도달'] = True
                     else:  # 시가 위치에 미포함
                         condition = 0
+                        self.Stocklist[code]['시가체크'] = True
                         self.Stocklist[code]['매수조건'] = condition
                         return result, condition, qty
                 else: # 시가가 매수가 중간인 경우 - 매수가1&2사이(band 1) : 조건 4,5 / 매수가2&3사이(band 2) : 조건 6
@@ -1816,6 +1811,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.Stocklist[code]['매수수량'] = self.Stocklist[code]['매수총수량'] // (condition % 2 + 1)
                     else:
                         condition = 0
+                        self.Stocklist[code]['시가체크'] = True
                         self.Stocklist[code]['매수조건'] = condition
                         return result, condition, qty
 
@@ -1829,7 +1825,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         # 매수조건 확정, 매수 수량 계산 완료
         # 매수상한에 미도달한 상태로 매수가로 내려왔을 때 매수
-        if self.Stocklist[code]['매수주문완료'] < len(self.Stocklist[code]['매수가전략']) and self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[0]:
+        if self.Stocklist[code]['매수주문완료'] < self.Stocklist[code]['매수가전략'] and self.Stocklist[code]['매수상한도달'] == False and 현재가 == 매수가[0]:
             result = True
             매수가.pop(0)
             self.Stocklist[code]['매수주문완료'] += 1
@@ -1838,8 +1834,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         if self.Stocklist[code]['매수상한도달'] == True: self.매수할종목.remove(code)
 
         qty = self.Stocklist[code]['매수수량']
-        print("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s"%(self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
-        logger.debug("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s" % (self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
+        if result == True:
+            print("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s"%(self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
+            logger.debug("종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s" % (self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
 
         return result, condition, qty
 
@@ -2043,7 +2040,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         try:
             self.portfolio[code] = CPortStock_ShortTerm(번호=self.Stocklist[code]['번호'], 종목코드=code, 종목명=self.Stocklist[code]['종목명'],
                                                         시장=self.Stocklist[code]['시장'], 매수가=buyprice,
-                                                        매수조건=condition, 보유일=self.Stocklist[code]['보유일'],
+                                                        매수조건=condition, 보유일=self.Stocklist['전략']['보유일'],
                                                         매도전략=self.Stocklist[code]['매도전략'], 매도가=self.Stocklist[code]['매도가'],
                                                         매도구간별조건=self.Stocklist['전략']['매도구간별조건'],
                                                         매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
@@ -2072,20 +2069,24 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         for code in codes: # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
             self.매수할종목.append(code)
 
-        if len(self.portfolio) > 0: # 포트폴리오에 있는 종목은 매도 관련 전략 재확인(구글시트) 및 '매도할종목'에 추가
+        # 포트폴리오에 있는 종목은 매도 관련 전략 재확인(구글시트) 및 '매도할종목'에 추가
+        if len(self.portfolio) > 0:
             row_data = shortterm_sell_sheet.get_all_values()
             idx_holding = row_data[0].index('보유일')
             idx_strategy = row_data[0].index('매도전략')
+            idx_loss = row_data[0].index('손절가')
             idx_sellprice = row_data[0].index('매도가')
             for row in row_data[1:]:
                 code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
                 self.portfolio[code].보유일 = row[idx_holding]
                 self.portfolio[code].매도전략 = row[idx_strategy]
-                self.portfolio[code].매도가 = []
-                if self.portfolio[code].매도전략 == '4':
+                self.portfolio[code].매도가 = [] # 매도 전략 변경에 따라 매도가 초기화
+                if self.portfolio[code].매도전략 == '4': # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                     self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
                     self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
-
+                    self.portfolio[code].매도가[1][0] = float(row[idx_loss][:-1])
+                else: # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
+                    self.portfolio[code].매도구간별조건[0] = float(row[idx_loss][:-1])
 
         for port_code in list(self.portfolio.keys()):
             # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
@@ -2171,6 +2172,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     if self.매수모니터링체크 == False:
                         for code in self.매수할종목:
                             if self.portfolio.get(code) is not None and code not in self.매도할종목:
+                                Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (종목코드, 종목명))
+                                logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (종목코드, 종목명))
                                 self.매수할종목.remove(code)
                                 self.매도할종목.append(code)
 
@@ -2238,7 +2241,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     P.종목명 = param['종목명']
                     P.매수가 = 체결가 # 단위체결가
                     P.수량 += 단위체결량 # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
-                    if P.매도전략 == '4': P.매도단위수량 = int(P.수량 / 3) # 전략4의 매도단위수량은 매수수량/3
 
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
                 else:
@@ -2247,7 +2249,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if 미체결수량 == 0:
                     try:
                         self.주문실행중_Lock.pop(주문)
-                        if self.Stocklist[종목코드]['매수주문완료'] == len(self.Stocklist[종목코드]['매수가전략']):
+                        if self.Stocklist[종목코드]['매수주문완료'] == self.Stocklist[종목코드]['매수가전략']:
+                            Telegram('%s %s 분할 매수 완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
+                            logger.info('%s %s 분할 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
                             self.매수할종목.remove(종목코드)
                             self.매도할종목.append(종목코드)
 
