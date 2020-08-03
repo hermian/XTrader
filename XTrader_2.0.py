@@ -1703,6 +1703,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
         # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+        if status == '매도모니터링':
+            row = []
+            row.append(self.portfolio[code].번호)
+            row.append(self.portfolio[code].종목명)
+
+            shortterm_sell_sheet.append_row(row)
 
         try:
             code_row = shortterm_history_sheet.findall(self.portfolio[code].종목명)[-1].row # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
@@ -2376,13 +2382,19 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         else:
             Telegram("[XTrader]%s ROBOT 실행 중지" % (self.sName))
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
+
             self.f.close()
             del self.f
             del self.wr
+
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
                     if self.portfolio[code].수량 == 0:
                         self.portfolio.pop(code)
+
+            if len(self.매도할종목) > 0:
+                for code in self.매도할종목:
+                    self.save_history(code, status='매도모니터링')
 
             if len(self.금일매도종목) > 0:
                 try:
