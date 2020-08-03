@@ -191,15 +191,16 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = False
+telegram_enable = True
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
-            if send == 'mc':
-                bot.sendMessage(CHAT_ID, str)
-            else:
-                bot.sendMessage(CHAT_ID, str)
-                bot_yoo.sendMessage(CHAT_ID_yoo, str)
+            # if send == 'mc':
+            #     bot.sendMessage(CHAT_ID, str)
+            # else:
+            #     bot.sendMessage(CHAT_ID, str)
+            #     bot_yoo.sendMessage(CHAT_ID_yoo, str)
+            bot.sendMessage(CHAT_ID, str)
         else:
             pass
     except Exception as e:
@@ -1038,14 +1039,12 @@ class CTrade(object):
 
             print(self.codeList)
 
+            self.ConditionLoop.exit()
+            return self.codeList
+
         except Exception as e:
             print("OnReceiveTrCondition_Error")
             print(e)
-
-        finally:
-            # pass
-            self.ConditionLoop.exit()
-            return self.codeList
 
     
     def OnReceiveConditionVer(self, lRet, sMsg):
@@ -2356,7 +2355,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     P.종목명 = param['종목명']
                     P.매수가 = 체결가  # 단위체결가
                     P.수량 += 단위체결량  # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
-                    if P.매도전략 == '4': P.매도단위수량 = int(P.수량 / 3)  # 전략4의 매도단위수량은 매수수량/3
 
                     P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
                 else:
@@ -3362,7 +3360,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
             self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
-            self.wr.writerow([체결시간, 종목코드, 종목명, 현재가, 전일대비])
 
             # 정액매도 후 포트폴리오/매도할종목에서 제거
             if 종목코드 in self.매도할종목:
@@ -3475,16 +3472,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                     Telegram('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e, send='mc')
                     logger.error('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
 
-                try:
-                    P = self.portfolio.get(종목코드)
-                    if P is not None:
-                        if P.수량 == 0:
-                            self.portfolio.pop(종목코드)
-                            logger.info('체결처리_매도 포트폴리오POP %s ' % 종목코드)
-                except Exception as e:
-                    Telegram('[XTrader]CTradeCondition 체결처리_매도 POP에러 종목명:%s' % param['종목명'], send='mc')
-                    logger.error('[XTrader]CTradeCondition 체결처리_매도 POP에러 종목명:%s' % param['종목명'])
-
         # 메인 화면에 반영
         self.parent.RobotView()
 
@@ -3542,10 +3529,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
 
                 if len(self.실시간종목리스트) > 0:
-                    self.f = open('data_result.csv', 'a', newline='')
-                    self.wr = csv.writer(self.f)
-                    self.wr.writerow(['체결시간', '종목코드', '종목명', '현재가', '전일대비'])
-
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 등록
                     logger.debug("실시간데이타요청 등록결과 %s" % ret)
 
@@ -3556,9 +3539,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         else:
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
-            self.f.close()
-            del self.f
-            del self.wr
 
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
@@ -4382,6 +4362,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # 1. 8시 58분 이전일 경우 5분 단위 구글시트 오퓨 체크 타이머 시작시킴
         current = datetime.datetime.now()
         current_time = current.strftime('%H:%M:%S')
+        """
         if '07:00:00' <= current_time and current_time <= '08:58:00':
             print('구글 시트 오류 체크 시작')
             # Telegram('[XTrader]구글 시트 오류 체크 시작')
@@ -4390,7 +4371,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.checkclock = QTimer(self)
             self.checkclock.timeout.connect(self.OnGoogleCheck)  # 5분마다 구글 시트 읽음 : MainWindow.OnGoogleCheck 실행
             self.checkclock.start(300000)  # 300000초마다 타이머 작동
-
+        """
         # 2. DB에 저장된 로봇 정보받아옴
         global 로봇거래계좌번호
         try:
@@ -4440,6 +4421,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.CODE_POOL = self.get_code_pool()  # DB 종목데이블에서 시장구분, 코드, 종목명, 주식수, 전일종가 읽어옴
             self.statusbar.showMessage("종목테이블 생성")
 
+        """
         # 8시 59분 : 구글 시트 종목 Import
         if current_time == '08:59:00':
             print('구글 시트 오류 체크 중지')
@@ -4456,6 +4438,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.Import_ShortTermStock(check=False)
 
                 self.statusbar.showMessage('구글시트 Import')
+        """
 
         # 8시 59분 30초 : 로봇 실행
         if '08:59:30' <= current_time and current_time < '08:59:40':
@@ -4488,14 +4471,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             quit()
 
         # 18시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
-        if '18:00:00' <= current_time and current_time < '18:00:05':
-            if self.DailyData == False:
-                self.DailyData = True
-                self.WeeklyData = False
-                self.MonthlyData = False
-                self.InvestorData = False
-                Telegram("[XTrader]관심종목 데이터 업데이트", send='mc')
-                self.stock_analysis()
+        # if '18:00:00' <= current_time and current_time < '18:00:05':
+        #     if self.DailyData == False:
+        #         self.DailyData = True
+        #         self.WeeklyData = False
+        #         self.MonthlyData = False
+        #         self.InvestorData = False
+        #         Telegram("[XTrader]관심종목 데이터 업데이트", send='mc')
+        #         self.stock_analysis()
 
         # if '153600' < current_time and current_time < '153659' and self.금일백업작업중 == False and self._login == True:# and current.weekday() == 4:
         # 수능일이면 아래 시간 조건으로 수정
@@ -4519,12 +4502,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
+        """
         if current_time > '08:59:00' and current_time <= '10:00:00':
             #if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
             if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
                 self.GetCondition()
-
+        """
             # if current.weekday() in workday_list: # 주중인지 확인
             #     if current_time in savetime_list: # 지정된 시간인지 확인
             #         logger.info("조건검색식 타이머 작동")
