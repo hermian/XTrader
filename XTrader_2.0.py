@@ -1760,19 +1760,27 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             else:   # 매도가가 기록되어 거래가  완료된 종목으로 판단하여 예외발생으로 신규 매수 추가함
                 raise Exception('매매완료 종목')
 
-        except:
-            row = []
-            row_buy = []
-            if status == '매수':
-                row.append(self.portfolio[code].번호)
-                row.append(self.portfolio[code].종목명)
-                row.append(self.portfolio[code].매수가)
-                row.append(self.portfolio[code].수량)
-                row.append(self.portfolio[code].매수일)
-                row.append(self.portfolio[code].매수전략)
-                row.append(self.portfolio[code].매수조건)
+        except Exception as e:
+            try:
+                logger.debug('CTradeShortTerm_save_history Error1 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                row = []
+                row_buy = []
+                if status == '매수':
+                    print('%s 매수이력 row 내용 생성'% self.portfolio[code].종목명)
+                    row.append(self.portfolio[code].번호)
+                    row.append(self.portfolio[code].종목명)
+                    row.append(self.portfolio[code].매수가)
+                    row.append(self.portfolio[code].수량)
+                    row.append(self.portfolio[code].매수일)
+                    row.append(self.portfolio[code].매수전략)
+                    row.append(self.portfolio[code].매수조건)
 
-            shortterm_history_sheet.append_row(row)
+                print('%s 매수이력 row 내용 생성완료'% self.portfolio[code].종목명)
+                shortterm_history_sheet.append_row(row)
+            except Exception as e:
+                print('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                Telegram('[XTrade]CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e),send='mc')
+                logger.debug('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
@@ -1841,7 +1849,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         if self.Stocklist[code]['매수주문완료'] < self.Stocklist[code]['매수가전략'] and self.Stocklist[code]['매수상한도달'] == False:
             if 현재가 == 매수가[0]:
                 result = True
-                매수가.pop(0)
+
                 self.Stocklist[code]['매수주문완료'] += 1
 
                 print("매수모니터링 만족_종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s"%(self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
@@ -2218,9 +2226,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
 
         except Exception as e:
-            print('CTradeShortTerm_실시간데이타처리 Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 Error : %s' % e, send='mc')
-            logger.error('CTradeShortTerm_실시간데이타처리 Error : %s' % e)
+            print('CTradeShortTerm_실시간데이타처리 Error : %s, %s' % (종목명, e))
+            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 Error : %s, %s' % (종목명, e), send='mc')
+            logger.error('CTradeShortTerm_실시간데이타처리 Error :%s, %s' % (종목명, e))
 
     def 접수처리(self, param):
         pass
@@ -2260,21 +2268,23 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     try:
                         self.주문실행중_Lock.pop(주문)
                         if self.Stocklist[종목코드]['매수주문완료'] >= self.Stocklist[종목코드]['매수가전략']:
-                            Telegram('%s %s 분할 매수 완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
-                            logger.info('%s %s 분할 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
                             self.매수할종목.remove(종목코드)
                             self.매도할종목.append(종목코드)
+                            self.Stocklist[종목코드]['매수가'].pop(0)
+                            Telegram('[XTrader]분할 매수 완료_종목명:%s, 종목코드:%s 매수가:%s, 수량:%s' % (P.종목명, 종목코드, P.매수가, P.수량))
+                            logger.info('분할 매수 완료_종목명:%s, 종목코드:%s 매수가:%s, 수량:%s' % (P.종목명, 종목코드, P.매수가, P.수량))
 
                         self.Stocklist[종목코드]['수량'] = P.수량
 
                         self.매수총액 += (P.매수가 * P.수량)
+                        logger.debug('체결처리완료_종목명:%s, 매수총액계산완료:%s' % (P.종목명, self.매수총액))
 
                         self.save_history(종목코드, status='매수')
                         Telegram('[XTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
-                        logger.info('%s %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (P.종목명, 종목코드, 주문))
+                        logger.info('매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
                     except Exception as e:
-                        Telegram('[XTrader]체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
-                        logger.error('체결처리_매수 POP에러 종목명:%s ' % P.종목명)
+                        Telegram('[XTrader]체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e), send='mc')
+                        logger.error('체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e))
 
 
         # 매도
