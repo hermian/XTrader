@@ -434,12 +434,18 @@ class CTrade(object):
     # 조건식 조회
     def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
         print("CTrade : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
-        isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int",
+        isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int)",
                                      screenNo, conditionName, conditionIndex, isRealTime)
 
         # receiveTrCondition() 이벤트 메서드에서 루프 종료
         self.ConditionLoop = QEventLoop()
         self.ConditionLoop.exec_()
+
+    # 조건식 조회 중지
+    def sendConditionStop(self, screenNo, conditionName, conditionIndex):
+        print("CTrade : sendConditionStop", screenNo, conditionName, conditionIndex)
+        isRequest = self.kiwoom.dynamicCall("SendConditionStop(QString, QString, int)",
+                                            screenNo, conditionName, conditionIndex)
 
     # 계좌 보유 종목 받음
     def InquiryList(self, _repeat=0):
@@ -1020,7 +1026,7 @@ class CTrade(object):
                 param['거래회전율'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 31).strip()
                 param['시가총액'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 311).strip()
 
-                self.실시간데이타처리(param)
+                self.실시간데이터처리(param)
 
         except Exception as e:
             print('CTrade_OnReceiveRealData Error ', e)
@@ -1045,7 +1051,6 @@ class CTrade(object):
             print("OnReceiveTrCondition_Error")
             print(e)
 
-    
     def OnReceiveConditionVer(self, lRet, sMsg):
         print("CTrade : OnReceiveConditionVer")
         try:
@@ -1066,10 +1071,15 @@ class CTrade(object):
         # :param strConditionIndex:
         # :return:
 
+        _now = datetime.datetime.now()
+        if _now.strftime('%H:%M:%S') < '09:03:00':  # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
+            return
+
         logger.info(
             'OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
 
         print("실시간조검검색_종목코드: %s %s"%(sTrCode, "종목편입" if strType == "I" else "종목이탈"))
+
         if strType == 'I':
             self.실시간조건처리(sTrCode)
 
@@ -2218,7 +2228,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         # print('종목코드 : %s, 종목명 : %s, 매입가 : %s, 보유수량 : %s' %(stock, 종목명, 매입가, 보유수량))
         # self.portfolio[stock] = CPortStock_ShortTerm(종목코드=stock, 종목명=종목명, 매수가=매입가, 수량=보유수량, 매수일='')
 
-    def 실시간데이타처리(self, param):
+    def 실시간데이터처리(self, param):
         try:
             if self.running == True:
 
@@ -2321,9 +2331,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
 
         except Exception as e:
-            print('CTradeShortTerm_실시간데이타처리 Error ', e)
-            Telegram('[StockTrader]CTradeShortTerm_실시간데이타처리 Error : %s' % e, send='mc')
-            logger.error('CTradeShortTerm_실시간데이타처리 Error : %s' % e)
+            print('CTradeShortTerm_실시간데이터처리 Error ', e)
+            Telegram('[StockTrader]CTradeShortTerm_실시간데이터처리 Error : %s' % e, send='mc')
+            logger.error('CTradeShortTerm_실시간데이터처리 Error : %s' % e)
 
     def 접수처리(self, param):
         pass
@@ -2960,7 +2970,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 self.매도할종목.append(port_code)
 
     # 주문처리
-    def 실시간데이타처리(self, param):
+    def 실시간데이터처리(self, param):
         if self.running == True:
 
             체결시간 = '%s %s:%s:%s' % (str(self.d), param['체결시간'][0:2], param['체결시간'][2:4], param['체결시간'][4:])
@@ -3220,10 +3230,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         self.d = today
 
-        self.보유일 = 1
-        self.익절 = 5 # percent
-        self.손절 = -2.7 # percent
-        self.투자금비중 = 70 # 예수금 대비 percent
 
     # 조건식 선택에 의해서 투자금, 매수/도 방법, 포트폴리오 수, 검색 종목 등이 저장됨
     def Setting(self, sScreenNo, 포트폴리오수, 조건식인덱스, 조건식명, 단위투자금, 매수방법, 매도방법):
@@ -3243,6 +3249,12 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def 초기조건(self, codes):
         # print("CTradeCondition : 초기조건")
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
+        
+        self.보유일 = 1
+        self.익절 = 5 # percent
+        self.고가대비 = -1  # percent
+        self.손절 = -2.7 # percent
+        self.투자금비중 = 70 # 예수금 대비 percentv
 
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
@@ -3261,6 +3273,24 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         for port_code in list(self.portfolio.keys()):  # 포트폴리오에 있는 종목은 '매도할종목'에 추가
             if port_code not in self.매도할종목:
                 self.매도할종목.append(port_code)
+
+    # 수동 포트폴리오 생성
+    def manual_portfolio(self):
+        self.portfolio = dict()
+        self.Stocklist = {
+            '006120': {'종목명': 'SK디스커버리', '종목코드': '006120', '매수가': [50900], '수량': 3, '보유일':1, '매수일': '2020/08/04 09:08:54'},
+
+            '026890': {'종목명': '디피씨', '종목코드': '026890', '매수가': [18250], '수량': 10, '보유일':1, '매수일': '2020/08/04 09:42:55'},
+
+            '042670': {'종목명': '두산인프라코어', '종목코드': '0042670', '매수가': [7390], '수량': 27, '보유일':1, '매수일': '2020/08/04 09:01:04'}
+        }
+
+        for code in list(self.Stocklist.keys()):
+            self.portfolio[code] = CPortStock(종목코드=code, 종목명=self.Stocklist[code]['종목명'],
+                                                        매수가=self.Stocklist[code]['매수가'][0],
+                                                        보유일=self.Stocklist[code]['보유일'],
+                                                        수량=self.Stocklist[code]['수량'],
+                                                        매수일=self.Stocklist[code]['매수일'])
 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
@@ -3323,19 +3353,24 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             return result, sell_price
 
         # 2. 익절 매도 전략
-        if 현재가 >= 매수가 * (1 + (abs(self.익절) / 100)):
+        if 현재가 >= 매수가 * (1 + (self.익절 / 100)):
             result = True
             sell_price = 현재가
 
-        # 3. 손절 매도 전략
-        elif 현재가 <= 매수가 * (1 - (abs(self.손절) / 100)):
+        # 3. 고가대비 비율 매도 전략
+        elif 현재가 <= 고가 * (1 + (self.고가대비 / 100)):
+            result = True
+            sell_price = 현재가
+
+        # 4. 손절 매도 전략
+        elif 현재가 <= 매수가 * (1 + (self.손절 / 100)):
             result = True
             sell_price = 현재가
 
         return result, sell_price
 
     # 주문처리
-    def 실시간데이타처리(self, param):
+    def 실시간데이터처리(self, param):
         if self.running == True:
 
             체결시간 = '%s %s:%s:%s' % (str(self.d), param['체결시간'][0:2], param['체결시간'][2:4], param['체결시간'][4:])
@@ -3380,7 +3415,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             if current_time <= '10:00:00':
                 if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
                     if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
-                        if self.단위투자금 // 현재가 > 0:
+                        if self.단위투자금 // 현재가 > 0 and 현재가 >= 고가 * (0.98):
                             (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
                             if result == True:
                                 self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일,
@@ -3391,6 +3426,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             else:
                                 Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
                                 logger.info('[XTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+            else:
+                self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
@@ -3492,6 +3529,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
         ret = 0
+        # self.manual_portfolio()
+
 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
@@ -3814,7 +3853,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.df_daily = DataFrame()
         self.df_weekly = DataFrame()
         self.df_monthly = DataFrame()
-        self.df_investor = DataFrame()                           
+        self.df_investor = DataFrame()
         self._login = False
 
         self.KiwoomLogin()  # 프로그램 실행 시 자동로그인
@@ -4349,7 +4388,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # :param conditionIndex: int - 조건식 인덱스
         # :param isRealTime: int - 조건검색 조회구분(0: 1회성 조회, 1: 실시간 조회)
 
-        isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int",
+        isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int)",
                                             screenNo, conditionName, conditionIndex, isRealTime)
 
         # receiveTrCondition() 이벤트 메서드에서 루프 종료
@@ -4440,7 +4479,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # 8시 59분 30초 : 로봇 실행
-        if '08:59:30' <= current_time and current_time < '08:59:40':
+        if '09:03:00' <= current_time and current_time < '09:03:05':
             try:
                 if len(self.robots) > 0:
                     for r in self.robots:
