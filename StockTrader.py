@@ -3249,7 +3249,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def 초기조건(self, codes):
         # print("CTradeCondition : 초기조건")
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
-        
+
         self.보유일 = 1
         self.익절 = 5 # percent
         self.고가대비 = -1  # percent
@@ -3278,11 +3278,17 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def manual_portfolio(self):
         self.portfolio = dict()
         self.Stocklist = {
-            '006120': {'종목명': 'SK디스커버리', '종목코드': '006120', '매수가': [50900], '수량': 3, '보유일':1, '매수일': '2020/08/04 09:08:54'},
+            '032190': {'종목명': '다우데이타', '종목코드': '032190', '매수가': [16150], '수량': 12, '보유일':1, '매수일': '2020/08/05 09:08:54'},
 
-            '026890': {'종목명': '디피씨', '종목코드': '026890', '매수가': [18250], '수량': 10, '보유일':1, '매수일': '2020/08/04 09:42:55'},
+            '047400': {'종목명': '유니온머티리얼', '종목코드': '047400', '매수가': [5350], '수량': 36, '보유일':1, '매수일': '2020/08/05 09:42:55'},
 
-            '042670': {'종목명': '두산인프라코어', '종목코드': '0042670', '매수가': [7390], '수량': 27, '보유일':1, '매수일': '2020/08/04 09:01:04'}
+            '085660': {'종목명': '차바이오텍', '종목코드': '085660', '매수가': [22100], '수량': 9, '보유일': 1,
+                       '매수일': '2020/08/05 09:08:54'},
+
+            '000020': {'종목명': '동화약품', '종목코드': '000020', '매수가': [25800
+                                                                ], '수량': 7, '보유일': 1,
+                       '매수일': '2020/08/05 09:42:55'},
+
         }
 
         for code in list(self.Stocklist.keys()):
@@ -3427,7 +3433,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                                 Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
                                 logger.info('[XTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
             else:
-                self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
+                ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
@@ -3576,6 +3582,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 logger.error('CTradeCondition_Run Error : %s' % e)
 
         else:
+            ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
             ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
 
             if self.portfolio is not None:
