@@ -63,7 +63,7 @@ shortterm_sell_sheet = doc.worksheet('매도모니터링')
 shortterm_strategy_sheet = doc.worksheet('ST bot')
 shortterm_history_sheet = doc.worksheet('매매이력')
 
-shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
+shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수조건', '매도가', '매도수량',
                           '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
 
 # 구글 스프레드시트 업데이트를 위한 알파벳리스트(열 이름 얻기위함)
@@ -944,7 +944,7 @@ class CTrade(object):
                 param['거래회전율'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 31).strip()
                 param['시가총액'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 311).strip()
 
-                self.실시간데이타처리(param)
+                self.실시간데이터처리(param)
 
         except Exception as e:
             print('CTradeShortTerm_OnReceiveRealData Error ', e)
@@ -1706,9 +1706,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def save_history(self, code, status):
         # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
         if status == '매도모니터링':
+            # 매도모니터링 시트 기존 자료 삭제
+            num_data = shortterm_sell_sheet.get_all_values()
+            for i in range(len(num_data)):
+                shortterm_sell_sheet.delete_row(2)
+
             row = []
             row.append(self.portfolio[code].번호)
             row.append(self.portfolio[code].종목명)
+            row.append(self.portfolio[code].매수가)
 
             shortterm_sell_sheet.append_row(row)
 
@@ -1751,9 +1757,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     cell = alpha_list[shortterm_history_cols.index('매수일')] + str(code_row)
                     shortterm_history_sheet.update_acell(cell, self.portfolio[code].매수일)
 
-                    cell = alpha_list[shortterm_history_cols.index('매수전략')] + str(code_row)
-                    shortterm_history_sheet.update_acell(cell, self.portfolio[code].매수전략)
-
                     cell = alpha_list[shortterm_history_cols.index('매수조건')] + str(code_row)
                     shortterm_history_sheet.update_acell(cell, self.portfolio[code].매수조건)
 
@@ -1772,7 +1775,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     row.append(self.portfolio[code].매수가)
                     row.append(self.portfolio[code].수량)
                     row.append(self.portfolio[code].매수일)
-                    row.append(self.portfolio[code].매수전략)
                     row.append(self.portfolio[code].매수조건)
 
                 print('%s 매수이력 row 내용 생성완료'% self.portfolio[code].종목명)
@@ -2095,15 +2097,25 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             idx_sellprice = row_data[0].index('목표가')
             for row in row_data[1:]:
                 code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
-                self.portfolio[code].보유일 = row[idx_holding]
-                self.portfolio[code].매도전략 = row[idx_strategy]
-                self.portfolio[code].매도가 = [] # 매도 전략 변경에 따라 매도가 초기화
-                if self.portfolio[code].매도전략 == '4': # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
-                    self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
-                    self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
-                    self.portfolio[code].매도가[1][0] = float(row[idx_loss][:-1])
-                else: # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
-                    self.portfolio[code].매도구간별조건[0] = float(row[idx_loss][:-1])
+                if code in list(self.portfolio.keys()):
+                    self.portfolio[code].보유일 = row[idx_holding]
+                    self.portfolio[code].매도전략 = row[idx_strategy]
+                    self.portfolio[code].매도가 = [] # 매도 전략 변경에 따라 매도가 초기화
+                    if self.portfolio[code].매도전략 == '4': # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
+                        self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
+                        self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
+                        self.portfolio[code].매도가[1][0] = float(row[idx_loss][:-1])
+
+                        self.portfolio[code].sellcount = 0
+                        self.portfolio[code].매도단위수량 = 0  # 전략4의 기본 매도 단위는 보유수량의 1/3
+                        self.portfolio[code].익절가1도달 = False
+                        self.portfolio[code].익절가2도달 = False
+                        self.portfolio[code].목표가도달 = False
+                    else: # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
+                        self.portfolio[code].매도구간별조건[0] = float(row[idx_loss][:-1])
+                        if self.portfolio[code].매도전략 == '2' or self.portfolio[code].매도전략 == '3':
+                            self.portfolio[code].목표도달 = False  # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
+                            self.portfolio[code].매도조건 = ''  # 구간매도 : B, 목표매도 : T
 
         for port_code in list(self.portfolio.keys()):
             # 로봇 시작 시 포트폴리오 종목의 매도구간(전일 매도모니터링)을 1로 초기화
@@ -2138,7 +2150,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # print('종목코드 : %s, 종목명 : %s, 매입가 : %s, 보유수량 : %s' %(stock, 종목명, 매입가, 보유수량))
             # self.portfolio[stock] = CPortStock_ShortTerm(종목코드=stock, 종목명=종목명, 매수가=매입가, 수량=보유수량, 매수일='')
 
-    def 실시간데이타처리(self, param):
+    def 실시간데이터처리(self, param):
         try:
             if self.running == True:
 
@@ -2206,10 +2218,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         if sell_check == True:
                             if 매도방법 == '00':
                                 (result, order) = self.정액매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가,
-                                                            수량=int(self.portfolio[종목코드].수량 * ratio))
+                                                            수량=round(self.portfolio[종목코드].수량 * ratio))
                             else:
                                 (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가,
-                                                        수량=int(self.portfolio[종목코드].수량 * ratio))
+                                                        수량=round(self.portfolio[종목코드].수량 * ratio))
 
                             if result == True:
                                 self.주문실행중_Lock['S_%s' % 종목코드] = True
@@ -2226,9 +2238,9 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
 
         except Exception as e:
-            print('CTradeShortTerm_실시간데이타처리 Error : %s, %s' % (종목명, e))
-            Telegram('[XTrader]CTradeShortTerm_실시간데이타처리 Error : %s, %s' % (종목명, e), send='mc')
-            logger.error('CTradeShortTerm_실시간데이타처리 Error :%s, %s' % (종목명, e))
+            print('CTradeShortTerm_실시간데이터처리 Error : %s, %s' % (종목명, e))
+            Telegram('[XTrader]CTradeShortTerm_실시간데이터처리 Error : %s, %s' % (종목명, e), send='mc')
+            logger.error('CTradeShortTerm_실시간데이터처리 Error :%s, %s' % (종목명, e))
 
     def 접수처리(self, param):
         pass
@@ -2338,9 +2350,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.running = flag
         ret = 0
         # self.manual_portfolio()
-        for code in list(self.portfolio.keys()):
-            print('종목명 : %s, 보유일 : %s, 매도전략 : %s, 매도가 : %s'%(self.portfolio[code].종목명, self.portfolio[code].보유일, self.portfolio[code].매도전략, self.portfolio[code].매도가))
 
+        for code in list(self.portfolio.keys()):
+            print(self.portfolio[code].__dict__)
+            logger.info(self.portfolio[code].__dict__)
+            # if code == '051490': self.portfolio.pop(code)
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             try:
