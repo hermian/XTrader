@@ -490,36 +490,41 @@ class CTrade(object):
         elif self.sName == 'TradeCondition':
             history_sheet = condition_history_sheet
             history_cols = condition_history_cols
+        try:
+            code_row = history_sheet.findall(매도결과[0])[-1].row
 
-        code_row = history_sheet.findall(매도결과[0])[-1].row
+            계산수익률 = round((int(float(매도결과[3])) / int(float(매도결과[2])) - 1) * 100, 2)
 
-        계산수익률 = round((int(float(매도결과[3])) / int(float(매도결과[2])) - 1) * 100, 2)
+            cell = alpha_list[history_cols.index('매수가')] + str(code_row)  # 매입단가
+            history_sheet.update_acell(cell, int(float(매도결과[2])))
 
-        cell = alpha_list[history_cols.index('매수가')] + str(code_row)  # 매입단가
-        history_sheet.update_acell(cell, int(float(매도결과[2])))
+            cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 체결가
+            history_sheet.update_acell(cell, int(float(매도결과[3])))
 
-        cell = alpha_list[history_cols.index('매도가')] + str(code_row)  # 체결가
-        history_sheet.update_acell(cell, int(float(매도결과[3])))
+            cell = alpha_list[history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
+            history_sheet.update_acell(cell, 계산수익률)
 
-        cell = alpha_list[history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
-        history_sheet.update_acell(cell, 계산수익률)
+            cell = alpha_list[history_cols.index('수익률')] + str(code_row)  # 손익율
+            history_sheet.update_acell(cell, 매도결과[5])
 
-        cell = alpha_list[history_cols.index('수익률')] + str(code_row)  # 손익율
-        history_sheet.update_acell(cell, 매도결과[5])
+            cell = alpha_list[history_cols.index('수익금')] + str(code_row)  # 손익율
+            history_sheet.update_acell(cell, int(float(매도결과[4])))
 
-        cell = alpha_list[history_cols.index('수익금')] + str(code_row)  # 손익율
-        history_sheet.update_acell(cell, int(float(매도결과[4])))
+            cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)  # 당일매매수수료 + 당일매매세금
+            history_sheet.update_acell(cell, int(float(매도결과[6])) + int(float(매도결과[7])))
 
-        cell = alpha_list[history_cols.index('세금+수수료')] + str(code_row)  # 당일매매수수료 + 당일매매세금
-        history_sheet.update_acell(cell, int(float(매도결과[6])) + int(float(매도결과[7])))
+            self.DailyProfitLoop.exit()
 
-        self.DailyProfitLoop.exit()
+            if self.update_cnt == 0:
+                print('금일 실현 손익 구글 업로드 완료')
 
-        if self.update_cnt == 0:
-            print('금일 실현 손익 구글 업로드 완료')
+                Telegram("[XTrader]금일 실현 손익 구글 업로드 완료")
+                logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
 
-            Telegram("[XTrader]금일 실현 손익 구글 업로드 완료")
-            logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
+        except:
+            self.DailyProfitLoop.exit() # 강제 루프 해제
+            print('[StockTrader]CTrade:DailyProfitUpload_%s 매도 이력 없음' % 매도결과[0])
+            logger.error('CTrade:DailyProfitUpload_%s 매도 이력 없음' % 매도결과[0])
 
     # 포트폴리오의 상태
     def GetStatus(self):
@@ -738,7 +743,7 @@ class CTrade(object):
         """
         # print('CTrade : OnReceiveTrData')
         try:
-            logger.debug('OnReceiveTrData [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] ' % (sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage, sSPlmMsg))
+            # logger.debug('OnReceiveTrData [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] [%s] ' % (sScrNo, sRQName, sTRCode, sRecordName, sPreNext, nDataLength, sErrorCode, sMessage, sSPlmMsg))
 
             if self.sScreenNo != int(sScrNo[:4]):
                 return
@@ -1075,8 +1080,7 @@ class CTrade(object):
         if _now.strftime('%H:%M:%S') < '09:03:00':  # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
             return
 
-        logger.info(
-            'OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
+        # logger.info('OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
 
         print("실시간조검검색_종목코드: %s %s"%(sTrCode, "종목편입" if strType == "I" else "종목이탈"))
 
@@ -3254,7 +3258,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.익절 = 5 # percent
         self.고가대비 = -1  # percent
         self.손절 = -2.7 # percent
-        self.투자금비중 = 70 # 예수금 대비 percentv
+        self.투자금비중 = 70 # 예수금 대비 percent
+
+        self.매수모니터링 = False
 
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
@@ -3433,7 +3439,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                                 Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
                                 logger.info('[XTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
             else:
-                ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
+                if self.매수모니터링 == False:
+                    self.매수모니터링 = True
+                    ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
@@ -3536,7 +3544,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.running = flag
         ret = 0
         # self.manual_portfolio()
-
 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
