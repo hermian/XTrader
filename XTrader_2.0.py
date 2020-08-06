@@ -1641,11 +1641,11 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     if data[0][-1] != '1' and data[0][-1] != '2':
                         self.Stocklist['전략']['매도구간별조건'].append(float(data[1][:-1]))
                 elif '손절가' == data[0]:
-                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1].replace('%','')))
                 elif '본전가' == data[0]:
-                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1].replace('%','')))
                 elif '익절가' in data[0]:
-                    self.Stocklist['전략']['전략매도가'].append(float(data[1][:-1]))
+                    self.Stocklist['전략']['전략매도가'].append(float(data[1].replace('%','')))
 
             self.Stocklist['전략']['매도구간별조건'].insert(0, self.Stocklist['전략']['전략매도가'][0]) # 손절가
             self.Stocklist['전략']['매도구간별조건'].insert(1, self.Stocklist['전략']['전략매도가'][1]) # 본전가
@@ -1709,7 +1709,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # 매도모니터링 시트 기존 자료 삭제
             num_data = shortterm_sell_sheet.get_all_values()
             for i in range(len(num_data)):
-                shortterm_sell_sheet.delete_row(2)
+                shortterm_sell_sheet.delete_rows(2)
 
             row = []
             row.append(self.portfolio[code].번호)
@@ -2104,7 +2104,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     if self.portfolio[code].매도전략 == '4': # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                         self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
                         self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
-                        self.portfolio[code].매도가[1][0] = float(row[idx_loss][:-1])
+                        self.portfolio[code].매도가[1][0] = float(row[idx_loss].replace('%',''))
 
                         self.portfolio[code].sellcount = 0
                         self.portfolio[code].매도단위수량 = 0  # 전략4의 기본 매도 단위는 보유수량의 1/3
