@@ -356,14 +356,14 @@ class CPortStock_ShortTerm(object):
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도구간=0, 매도가=0, 수량=0):
+    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도구간=0, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.매수가 = 매수가
         self.보유일 = 보유일
+        self.매도전략 = 매도전략
         self.매도구간 = 매도구간
-        self.매도가 = 매도가 # 0 : 손절, 1 : 익절
         self.수량 = 수량
 
 
@@ -3278,6 +3278,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         for port_code in list(self.portfolio.keys()):  # 포트폴리오에 있는 종목은 '매도할종목'에 추가
             if port_code not in self.매도할종목:
+                self.portfolio[port_code].매도전략 = 3
                 self.매도할종목.append(port_code)
 
     # 수동 포트폴리오 생성
@@ -3348,6 +3349,16 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 Telegram('[StockTrader]CTradeCondition_save_history Error : %s' % e, send='mc')
                 logger.error('CTradeCondition_save_history Error : %s' % e)
 
+    # 매수 전략별 매수 조건 확인
+    def buy_strategy(self, code, price):
+        result = False
+
+        현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
+        if self.단위투자금 // 현재가 > 0 and 현재가 >= 고가 * (0.99):
+            result = True
+
+        return result
+
     # 매도 전략
     def sell_strategy(self, code, price):
         result = False
@@ -3358,26 +3369,27 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         # 1. 보유일 제한 매도 전략 : 보유일이 1이면 하루보유하고 다음날 매도
         #    holdingcal은 첫날부터 1일 보유로 계산됨
-        보유기간 = holdingcal(self.portfolio[code].매수일)
-        if 보유기간 - 1 >= int(self.portfolio[code].보유일):
-            result = True
-            sell_price = 전일종가
-            return result, sell_price
+        # 보유기간 = holdingcal(self.portfolio[code].매수일)
+        # if 보유기간 - 1 >= int(self.portfolio[code].보유일):
+            # result = True
+            # sell_price = 전일종가
+            # return result, sell_price
+
 
         # 2. 익절 매도 전략
-        if 현재가 >= 매수가 * (1 + (self.익절 / 100)):
+        if 현재가 >= 매수가 * (1 + (self.portfolio[code].매도전략 / 100)):
             result = True
             sell_price = 현재가
 
         # 3. 고가대비 비율 매도 전략
-        elif 현재가 <= 고가 * (1 + (self.고가대비 / 100)):
-            result = True
-            sell_price = 현재가
+        # elif 현재가 <= 고가 * (1 + (self.고가대비 / 100)):
+        #     result = True
+        #     sell_price = 현재가
 
         # 4. 손절 매도 전략
-        elif 현재가 <= 매수가 * (1 + (self.손절 / 100)):
-            result = True
-            sell_price = 현재가
+        # elif 현재가 <= 매수가 * (1 + (self.손절 / 100)):
+        #     result = True
+        #     sell_price = 현재가
 
         return result, sell_price
 
@@ -3427,10 +3439,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             if current_time <= '10:00:00':
                 if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
                     if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
-                        if self.단위투자금 // 현재가 > 0 and 현재가 >= 고가 * (0.98):
+                        buy_check = self.buy_strategy(종목코드, 시세)
+                        if buy_check == True:
                             (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
                             if result == True:
-                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일,
+                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
                                                                   매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
                                 self.주문실행중_Lock['B_%s' % 종목코드] = True
                                 Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
@@ -3445,7 +3458,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
-        if code not in self.매수할종목:
+        if current_time <= '10:00:00' and code not in self.매수할종목:
             print('매수종목추가 : ', code)
             self.매수할종목.append(code)
             self.실시간종목리스트.append(code)
