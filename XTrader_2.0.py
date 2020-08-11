@@ -2346,6 +2346,36 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         Telegram('[XTrader]체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e), send='mc')
                         logger.error('체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e))
 
+        # 매도
+        if param['매도수구분'] == '1':
+            if self.주문번호_주문_매핑.get(주문번호) is not None:
+                주문 = self.주문번호_주문_매핑[주문번호]
+                매도가 = int(주문[2:])
+
+                try:
+                    if 미체결수량 == 0:
+                        self.주문실행중_Lock.pop(주문)
+
+                        P = self.portfolio.get(종목코드)
+                        if P is not None:
+                            P.종목명 = param['종목명']
+
+                        self.Stocklist[종목코드]['매수가'] = self.portfolio[종목코드].매수가
+                        self.Stocklist[종목코드]['매도체결가'] = 체결가
+                        self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
+                        self.Stocklist[종목코드]['매도수량'] = 주문수량
+                        self.save_history(종목코드, status='매도')
+
+                        Telegram('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+                        logger.info('매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+
+                except Exception as e:
+                    Telegram('[XTrader]체결처리_매도 Error : %s' % e, send='mc')
+                    logger.error('체결처리_매도 Error : %s' % e)
+
+        # 메인 화면에 반영
+        self.parent.RobotView()
+
     def 잔고처리(self, param):
         # print('CTradeShortTerm : 잔고처리')
 
