@@ -1556,7 +1556,6 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
             print('화면_TradeShortTerm : inquiry Error ', e)
             logger.error('화면_TradeShortTerm : inquiry Error : %s' % e)
 
-
 class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
     def __init__(self, sName, UUID, kiwoom=None, parent=None):
         self.sName = sName
@@ -2121,6 +2120,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.portfolio[code].보유일 = row[idx_holding]
                     self.portfolio[code].매도전략 = row[idx_strategy]
                     self.portfolio[code].매도가 = []  # 매도 전략 변경에 따라 매도가 초기화
+
+                    # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
+                    self.portfolio[code].매도구간별조건[0] = float(row[idx_loss].replace('%', '')) # 손절가 업데이트
+
                     if self.portfolio[code].매도전략 == '4':  # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                         self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
                         self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
@@ -2131,8 +2134,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].익절가1도달 = False
                         self.portfolio[code].익절가2도달 = False
                         self.portfolio[code].목표가도달 = False
-                    else:  # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
-                        self.portfolio[code].매도구간별조건[0] = float(row[idx_loss][:-1])
+                    else:
                         if self.portfolio[code].매도전략 == '2' or self.portfolio[code].매도전략 == '3':
                             self.portfolio[code].목표도달 = False  # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
                             self.portfolio[code].매도조건 = ''  # 구간매도 : B, 목표매도 : T
@@ -2401,7 +2403,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         for code in list(self.portfolio.keys()):
             print(self.portfolio[code].__dict__)
             logger.info(self.portfolio[code].__dict__)
-            # if code == '051490': self.portfolio.pop(code)
+
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             try:
@@ -2434,9 +2436,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                 print("포트폴리오 매도모니터링 수정")
                 for code in list(self.portfolio.keys()):
-                    print('종목명 : %s, 보유일 : %s, 매도전략 : %s, 매도가 : %s' % (
-                        self.portfolio[code].종목명, self.portfolio[code].보유일, self.portfolio[code].매도전략,
-                        self.portfolio[code].매도가))
+                    print(self.portfolio[code].__dict__)
+                    logger.info(self.portfolio[code].__dict__)
 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
@@ -2466,18 +2467,18 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             del self.wr
 
             if self.portfolio is not None:
-                for code in list(self.portfolio.keys()):
-                    if self.portfolio[code].수량 == 0:
-                        self.portfolio.pop(code)
-
-            if len(self.매도할종목) > 0:
-                # 매도모니터링 시트 기존 자료 삭제
+                # 구글 매도모니터링 시트 기존 종목 삭제
                 num_data = shortterm_sell_sheet.get_all_values()
                 for i in range(len(num_data)):
                     shortterm_sell_sheet.delete_rows(2)
 
-                for code in self.매도할종목:
-                    self.save_history(code, status='매도모니터링')
+                for code in list(self.portfolio.keys()):
+                    # 매수 미체결 종목 삭제
+                    if self.portfolio[code].수량 == 0:
+                        self.portfolio.pop(code)
+                    else:
+                        # 포트폴리오 종목은 구글 매도모니터링 시트에 추가하여 전략 수정가능
+                        self.save_history(code, status='매도모니터링')
 
             if len(self.금일매도종목) > 0:
                 try:
