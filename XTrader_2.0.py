@@ -1706,6 +1706,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     # google spreadsheet 매매이력 생성
     def save_history(self, code, status):
         # 매매이력 sheet에 해당 종목(매수된 종목)이 있으면 row를 반환 아니면 예외처리 -> 신규 매수로 처리
+        # 매수 이력 : 체결처리, 매수, 미체결수량 0에서 이력 저장
+        # 매도 이력 : 체결처리, 매도, 미체결수량 0에서 이력 저장
         if status == '매도모니터링':
             row = []
             row.append(self.portfolio[code].번호)
@@ -1715,27 +1717,26 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             shortterm_sell_sheet.append_row(row)
 
         try:
-            code_row = shortterm_history_sheet.findall(self.portfolio[code].종목명)[
-                -1].row  # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
+            code_row = shortterm_history_sheet.findall(self.portfolio[code].종목명)[-1].row  # 종목명이 있는 모든 셀을 찾아서 맨 아래에 있는 셀을 선택
             cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)  # 매수 이력에 있는 종목이 매도가 되었는지 확인
             sell_price = shortterm_history_sheet.acell(str(cell)).value
 
             # 매도 이력은 추가 매도(매도전략2의 경우)나 신규 매도인 경우라 매도 이력 유무와 상관없음
             if status == '매도':  # 매도 이력은 포트폴리오에서 종목 pop을 하므로 Stocklist 데이터 사용
                 cell = alpha_list[shortterm_history_cols.index('매도가')] + str(code_row)
-                shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도체결가'])
+                shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도체결가)
 
                 cell = alpha_list[shortterm_history_cols.index('매도수량')] + str(code_row)
-                shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도수량'])
+                shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도수량)
 
                 cell = alpha_list[shortterm_history_cols.index('매도일')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
 
                 cell = alpha_list[shortterm_history_cols.index('매도전략')] + str(code_row)
-                shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도전략'])
+                shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도전략)
 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
-                shortterm_history_sheet.update_acell(cell, self.Stocklist[code]['매도구간'])
+                shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도구간)
 
                 계산수익률 = round((self.Stocklist[code]['매도체결가'] / self.Stocklist[code]['매수가'] - 1) * 100, 2)
                 cell = alpha_list[shortterm_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
@@ -2362,10 +2363,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         if P is not None:
                             P.종목명 = param['종목명']
 
-                        self.Stocklist[종목코드]['매수가'] = self.portfolio[종목코드].매수가
-                        self.Stocklist[종목코드]['매도체결가'] = 체결가
-                        self.Stocklist[종목코드]['매도구간'] = self.portfolio[종목코드].매도구간
-                        self.Stocklist[종목코드]['매도수량'] = 주문수량
+                        self.portfolio[종목코드].매도체결가 = 체결가
+                        self.portfolio[종목코드].매도수량 = 주문수량
                         self.save_history(종목코드, status='매도')
 
                         Telegram('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
