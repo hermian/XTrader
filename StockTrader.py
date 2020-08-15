@@ -3234,7 +3234,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         self.d = today
 
-
     # 조건식 선택에 의해서 투자금, 매수/도 방법, 포트폴리오 수, 검색 종목 등이 저장됨
     def Setting(self, sScreenNo, 포트폴리오수, 조건식인덱스, 조건식명, 단위투자금, 매수방법, 매도방법):
         # print("CTradeCondition : Setting")
@@ -3277,9 +3276,15 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         #         self.매수할종목.append(code)
 
         for port_code in list(self.portfolio.keys()):  # 포트폴리오에 있는 종목은 '매도할종목'에 추가
-            if port_code not in self.매도할종목:
+            보유기간 = holdingcal(self.portfolio[port_code].매수일) - 1
+            if 보유기간 < 3:
+                self.portfolio[port_code].매도전략 = 5  # 매도지연 종목은 목표가 낮춤 5% -> 3% -> 1%
+            elif 보유기간 >= 3 and 보유기간 < 5:
                 self.portfolio[port_code].매도전략 = 3
-                self.매도할종목.append(port_code)
+            elif 보유기간 >= 3 and 보유기간 < 5:
+                self.portfolio[port_code].매도전략 = 1
+
+            self.매도할종목.append(port_code)
 
     # 수동 포트폴리오 생성
     def manual_portfolio(self):
@@ -3321,6 +3326,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 cell = alpha_list[condition_history_cols.index('매도일')] + str(code_row)
                 condition_history_sheet.update_acell(cell, datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+
+                계산수익률 = round((self.portfolio[code].매도가 / self.portfolio[code].매수가 - 1) * 100, 2)
+                cell = alpha_list[condition_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
+                condition_history_sheet.update_acell(cell, 계산수익률)
 
             # 매수 이력은 있으나 매도 이력이 없음 -> 매도 전 추가 매수
             if sell_price == '':
@@ -3366,15 +3375,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
         매수가 = self.portfolio[code].매수가
-
-        # 1. 보유일 제한 매도 전략 : 보유일이 1이면 하루보유하고 다음날 매도
-        #    holdingcal은 첫날부터 1일 보유로 계산됨
-        # 보유기간 = holdingcal(self.portfolio[code].매수일)
-        # if 보유기간 - 1 >= int(self.portfolio[code].보유일):
-            # result = True
-            # sell_price = 전일종가
-            # return result, sell_price
-
 
         # 2. 익절 매도 전략
         if 현재가 >= 매수가 * (1 + (self.portfolio[code].매도전략 / 100)):
