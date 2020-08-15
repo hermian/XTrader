@@ -797,7 +797,7 @@ class CTrade(object):
         try:
             # 접수
             if sGubun == "0":
-                # logger.debug('OnReceiveChejanData: 접수 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
+                logger.debug('OnReceiveChejanData: 접수 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
 
                 화면번호 = self.kiwoom.dynamicCall('GetChejanData(QString)', 920)
 
@@ -858,7 +858,7 @@ class CTrade(object):
 
             # 잔고통보
             if sGubun == "1":
-                # logger.debug('OnReceiveChejanData: 잔고통보 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
+                logger.debug('OnReceiveChejanData: 잔고통보 [%s] [%s] [%s]' % (sGubun, nItemCnt, sFidList))
 
                 param = dict()
 
@@ -1727,6 +1727,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도체결가)
 
                 cell = alpha_list[shortterm_history_cols.index('매도수량')] + str(code_row)
+                수량 = shortterm_history_sheet.acell(cell).value # 분할 매도의 경우 이전 매도 수량이 기록되어 있음
+                if 수량 != '': self.portfolio[code].매도수량 += int(수량) # 매도수량은 주문 수량이므로 기존 수량을 합해줌
                 shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도수량)
 
                 cell = alpha_list[shortterm_history_cols.index('매도일')] + str(code_row)
