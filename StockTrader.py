@@ -334,13 +334,12 @@ class PandasModel(QtCore.QAbstractTableModel):
 # 포트폴리오에 사용되는 주식정보 클래스
 # TradeShortTerm용 포트폴리오
 class CPortStock_ShortTerm(object):
-    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수전략, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
+    def __init__(self, 번호, 매수일, 종목코드, 종목명, 시장, 매수가, 매수조건, 보유일, 매도전략, 매도구간별조건, 매도구간=1, 매도가=0, 수량=0):
         self.번호 = 번호
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.시장 = 시장
-        self.매수전략 = 매수전략
         self.매수가 = 매수가
         self.매수조건 = 매수조건
         self.보유일 = 보유일
@@ -350,9 +349,15 @@ class CPortStock_ShortTerm(object):
         self.매도가 = 매도가
         self.수량 = 수량
 
-        if self.매도전략 == '5':
+        if self.매도전략 == '2' or self.매도전략 == '3':
             self.목표도달 = False # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
             self.매도조건 = '' # 구간매도 : B, 목표매도 : T
+        elif self.매도전략 == '4':
+            self.sellcount = 0
+            self.매도단위수량 = 0 # 전략4의 기본 매도 단위는 보유수량의 1/3
+            self.익절가1도달 = False
+            self.익절가2도달 = False
+            self.목표가도달 = False
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
