@@ -70,7 +70,7 @@ stock_sheet = doc.worksheet('종목선정') # Sheet
 shortterm_history_sheet = doc.worksheet('매매이력')
 condition_history_sheet = doc_test.worksheet('조건식이력')
 shortterm_analysis_sheet = doc.worksheet('관심종목')
-test_analysis_sheet = doc_test.worksheet('test')
+# test_analysis_sheet = doc_test.worksheet('test')
 
 shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
                           '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
@@ -361,14 +361,15 @@ class CPortStock_ShortTerm(object):
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도구간=0, 수량=0):
+    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.매수가 = 매수가
         self.보유일 = 보유일
         self.매도전략 = 매도전략
-        self.매도구간 = 매도구간
+        self.매도전략변경1 = 매도전략변경1
+        self.매도전략변경2 = 매도전략변경2
         self.수량 = 수량
 
 
@@ -3381,6 +3382,15 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
         매수가 = self.portfolio[code].매수가
 
+        if self.portfolio[code].매도전략변경1 == False and current_time >= '11:00:00' and current_time < '13:00:00':
+            self.portfolio[code].매도전략변경1 = True
+            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 / 3
+        elif self.portfolio[code].매도전략변경2 == False and current_time >= '13:00:00':
+            self.portfolio[code].매도전략변경2 = True
+            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 / 3
+        if self.portfolio[code].매도전략 < 0.3:
+            self.portfolio[code].매도전략 = 0.3
+
         # 2. 익절 매도 전략
         if 현재가 >= 매수가 * (1 + (self.portfolio[code].매도전략 / 100)):
             result = True
@@ -3576,20 +3586,21 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 self.주문번호_주문_매핑 = dict()
                 self.주문실행중_Lock = dict()
 
-                print("조건식 인덱스 : ", self.조건식인덱스, type(self.조건식인덱스))
-                print("조건식명 : ", self.조건식명)
-
-                codes = self.GetCodes(self.조건식인덱스, self.조건식명)
-                self.초기조건(codes)
-
                 self.투자총액 = floor(int(d2deposit.replace(",", "")) * (self.투자금비중 / 100))
 
                 print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
                 print('투자금 : ', self.투자총액)
                 print('단위투자금 : ', self.단위투자금)
 
-                self.최대포트수 = floor(self.투자총액 / self.단위투자금)
+                self.최대포트수 = floor(self.투자총액 / self.단위투자금) + len(self.portfolio)
+                print('기존포트수 : ', len(self.portfolio))
                 print('최대포트수 : ', self.최대포트수)
+
+                print("조건식 인덱스 : ", self.조건식인덱스, type(self.조건식인덱스))
+                print("조건식명 : ", self.조건식명)
+
+                codes = self.GetCodes(self.조건식인덱스, self.조건식명)
+                self.초기조건(codes)
 
                 print("매수 : ", self.매수할종목)
                 print("매도 : ", self.매도할종목)
