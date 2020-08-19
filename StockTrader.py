@@ -3290,6 +3290,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             elif 보유기간 >= 3 and 보유기간 < 5:
                 self.portfolio[port_code].매도전략 = 1
 
+            print(self.portfolio[port_code].__dict__)
+            logger.info(self.portfolio[port_code].__dict__)
+            
             self.매도할종목.append(port_code)
 
     # 수동 포트폴리오 생성
