@@ -3387,10 +3387,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         if self.portfolio[code].매도전략변경1 == False and current_time >= '11:00:00' and current_time < '13:00:00':
             self.portfolio[code].매도전략변경1 = True
-            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 / 3
+            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 * 0.6
         elif self.portfolio[code].매도전략변경2 == False and current_time >= '13:00:00':
             self.portfolio[code].매도전략변경2 = True
-            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 / 3
+            self.portfolio[code].매도전략 = self.portfolio[code].매도전략 * 0.6
         if self.portfolio[code].매도전략 < 0.3:
             self.portfolio[code].매도전략 = 0.3
 
