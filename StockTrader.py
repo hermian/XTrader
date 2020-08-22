@@ -4461,7 +4461,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
         self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
-        conditions = ['매물대거래량','외국인기관수급', '주도주', '스토캐스틱&MACD','스토캐스틱&MACD&거래량회전율']
+        conditions = ['매물대거래량','외국인기관수급', '주도주', '당일주도주', '스토캐스틱&MACD&거래량회전율', '갭상승']
         try:
             self.getConditionLoad()
 
@@ -4470,7 +4470,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             for index in self.condition.keys():  # condition은 dictionary
                 # print(self.condition)
-                if self.condition[index] == '주도주': #in conditions:
+                if self.condition[index] in conditions:
                     self.conditionid.append(str(index))
                     self.conditionname.append(self.condition[index])
                     print('조건 검색 시작')
@@ -4704,13 +4704,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        """
-        if current_time > '08:59:00' and current_time <= '10:00:00':
-            #if current.second == 0 and current.minute % 5 == 0 and self.ConditionCheck == False:
+        if current_time > '21:00:00' and current_time <= '21:30:00':
             if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
                 self.GetCondition()
-        """
+
             # if current.weekday() in workday_list: # 주중인지 확인
             #     if current_time in savetime_list: # 지정된 시간인지 확인
             #         logger.info("조건검색식 타이머 작동")
