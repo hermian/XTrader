@@ -146,7 +146,7 @@ def import_googlesheet():
             row.insert(2, code)
             row.insert(3, market)
 
-        print('[XTrader]구글 시트 확인 완료')
+        print('[StockTrader]구글 시트 확인 완료')
         # Telegram('[StockTrader]구글 시트 확인 완료')
         # logger.info('[XTrader]구글 시트 확인 완료')
 
@@ -524,8 +524,8 @@ class CTrade(object):
             if self.update_cnt == 0:
                 print('금일 실현 손익 구글 업로드 완료')
 
-                Telegram("[XTrader]금일 실현 손익 구글 업로드 완료")
-                logger.info("[XTrader]금일 실현 손익 구글 업로드 완료")
+                Telegram("[StockTrader]금일 실현 손익 구글 업로드 완료")
+                logger.info("[StockTrader]금일 실현 손익 구글 업로드 완료")
 
         except:
             self.DailyProfitLoop.exit() # 강제 루프 해제
@@ -1811,7 +1811,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
-            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
+            Telegram('[StockTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_Setting Error : %s' % e)
 
     # 수동 포트폴리오 생성
@@ -2113,7 +2113,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 except Exception as e:
                     print('sell_strategy 매도전략 2 Error :', e)
                     logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e))
-                    Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
+                    Telegram('[StockTrader']CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
                     result = False
                     return 매도방법, result, qty_ratio
 
@@ -2182,7 +2182,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
-            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
+            Telegram('[StockTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_sell_strategy Error : %s' % e)
             result = False
             qty_ratio = 1
@@ -3566,10 +3566,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             self.주문실행중_Lock['S_%s' % 종목코드] = True
                             if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
                             Telegram('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
-                            logger.info('[XTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
+                            logger.info('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
                         else:
                             Telegram('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
-                            logger.info('[XTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
+                            logger.info('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
 
             # 매수할 종목에 대해서 정액매수 주문하고 포트폴리오/매도할종목에 추가, 매수할종목에서 제외
             if current_time <= '10:00:00':
@@ -3583,10 +3583,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                                                                   매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
                                 self.주문실행중_Lock['B_%s' % 종목코드] = True
                                 Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                                logger.info('[XTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                                logger.info('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
                             else:
                                 Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                                logger.info('[XTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                                logger.info('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
             else:
                 if self.매수모니터링 == False:
                     self.매수모니터링 = True
@@ -3641,10 +3641,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         self.save_history(종목코드, status='매수')
 
                         Telegram('[StockTrader]CTradeCondition 매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량), send='mc')
-                        logger.info('[XTrader]CTradeCondition %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
+                        logger.info('[StockTrader]CTradeCondition %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
                     except Exception as e:
                         Telegram('[StockTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
-                        logger.error('[XTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명)
+                        logger.error('[StockTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명)
 
         # 매도
         if param['매도수구분'] == '1':
@@ -3665,11 +3665,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         self.save_history(종목코드, status='매도')
 
                         Telegram('[StockTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량), send='mc')
-                        logger.info('[XTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+                        logger.info('[StockTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
                     Telegram('[StockTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e, send='mc')
-                    logger.error('[XTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
+                    logger.error('[StockTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
 
         # 메인 화면에 반영
         self.parent.RobotView()
@@ -3749,7 +3749,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
             if len(self.금일매도종목) > 0:
                 try:
-                    Telegram("[XTrader]%s 금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목), send='mc')
+                    Telegram("[StockTrader]%s 금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목), send='mc')
                     logger.info("%s 금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목))
                     self.parent.statusbar.showMessage("금일 매도 종목 손익 Upload")
                     self.DailyProfit(self.금일매도종목)
@@ -4704,7 +4704,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        if current_time > '21:00:00' and current_time <= '21:30:00':
+        if current_time > '08:58:00' and current_time <= '15:30:00':
             if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
                 self.ConditionCheck = True
                 self.GetCondition()
@@ -5031,7 +5031,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             current = datetime.datetime.now().strftime('%H:%M:%S')
             if current <= '08:58:00':
-                Telegram("[XTrader]키움API 로그인 성공")
+                Telegram("[StockTrader]키움API 로그인 성공")
 
             로그인상태 = True
             # 로그인 성공하고 바로 계좌 및 보유 주식 목록 저장
@@ -6097,12 +6097,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 if __name__ == "__main__":
     # 1.로그 인스턴스를 만든다.
-    logger = logging.getLogger('XTrader')
+    logger = logging.getLogger('StockTrader')
     # 2.formatter를 만든다.
     formatter = logging.Formatter('[%(levelname)s|%(filename)s:%(lineno)s]%(asctime)s>%(message)s')
 
     loggerLevel = logging.DEBUG
-    filename = "LOG/XTrader.log"
+    filename = "LOG/StockTrader.log"
 
     # 스트림과 파일로 로그를 출력하는 핸들러를 각각 만든다.
     filehandler = logging.FileHandler(filename)
@@ -6127,7 +6127,7 @@ if __name__ == "__main__":
 
     current = datetime.datetime.now().strftime('%H:%M:%S')
     if current <= '08:58:00':
-        Telegram("[XTrader]프로그램이 실행되었습니다.")
+        Telegram("[StockTrader]프로그램이 실행되었습니다.")
 
 
     # 프로그램 실행 후 3초 후에 한번 신호 받고, 그 다음 1초 마다 신호를 계속 받음
