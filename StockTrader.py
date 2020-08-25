@@ -191,7 +191,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = True
+telegram_enable = False
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -2113,7 +2113,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 except Exception as e:
                     print('sell_strategy 매도전략 2 Error :', e)
                     logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e))
-                    Telegram('[StockTrader']CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
+                    Telegram('[StockTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
                     result = False
                     return 매도방법, result, qty_ratio
 
@@ -4648,7 +4648,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if len(self.robots) > 0:
                     for r in self.robots:
                         if r.running == False:  # 로봇이 실행중이 아니면
-                            r.Run(flag=True, sAccount=로봇거래계좌번호)
+                            # r.Run(flag=True, sAccount=로봇거래계좌번호)
                             self.RobotView()
             except Exception as e:
                 print('Robot Auto Run Error', e)
