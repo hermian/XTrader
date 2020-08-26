@@ -1676,14 +1676,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def manual_portfolio(self):
         self.portfolio = dict()
         self.Stocklist = {
-            '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
+            '024840': {'번호': '8.030', '종목명': 'KBI메탈', '종목코드': '024840', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [1468],
+                       '매수조건': 2, '수량': 310, '매도전략': '1', '매도가': [], '매수일': '2020/08/26 09:56:54'},
+
+            '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [3219],
                        '매수조건': 1, '수량': 310, '매도전략': '4', '매도가': [3700], '매수일': '2020/05/29 09:22:39'},
 
-            '297090': {'번호': '7.101', '종목명': '씨에스베어링', '종목코드': '297090', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5000],
+            '297090': {'번호': '7.101', '종목명': '씨에스베어링', '종목코드': '297090', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [5000],
                        '매수조건': 3, '수량': 15, '매도전략': '2', '매도가': [], '매수일': '2020/06/03 09:12:15'},
 
-            '053610': {'번호': '6.154', '종목명': '프로텍', '종목코드': '053610', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [9500],
-                       '매수조건': 2, '수량': 26, '매도전략': '4', '매도가': [9900], '매수일': '2020/06/03 09:12:15'}
         }
 
         self.strategy = {'전략': {'단위투자금': 200000, '모니터링종료시간': '10:30:00', '보유일': 20,
@@ -2125,12 +2126,17 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.portfolio[code].매도가 = []  # 매도 전략 변경에 따라 매도가 초기화
 
                     # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
-                    self.portfolio[code].매도구간별조건[0] = float(row[idx_loss].replace('%', '')) # 손절가 업데이트
+                    self.portfolio[code].매도구간별조건 = []
+                    self.portfolio[code].매도구간별조건.append(float(row[idx_loss].replace('%', '')))  # 손절가 업데이트
+                    for idx in range(1, len(self.Stocklist['전략']['매도구간별조건'])): # Stocklist의 매도구간별조건 전체를 바로 append할 경우 모든 종목이 동일한 값으로 들어감
+                        self.portfolio[code].매도구간별조건.append(self.Stocklist['전략']['매도구간별조건'][idx])
 
                     if self.portfolio[code].매도전략 == '4':  # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                         self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
-                        self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
-                        self.portfolio[code].매도가[1][0] = float(row[idx_loss].replace('%', ''))
+                        self.portfolio[code].매도가.append([])
+                        for idx in range(len(self.Stocklist['전략']['전략매도가'])): # Stocklist의 전략매도가 전체를 바로 append할 경우 모든 종목이 동일한 값으로 들어감
+                            self.portfolio[code].매도가[1].append(self.Stocklist['전략']['전략매도가'][idx])
+                        self.portfolio[code].매도가[1][0] = self.portfolio[code].매도구간별조건[0] # float(row[idx_loss].replace('%', ''))
 
                         self.portfolio[code].sellcount = 0
                         self.portfolio[code].매도단위수량 = 0  # 전략4의 기본 매도 단위는 보유수량의 1/3
@@ -2439,6 +2445,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 for code in list(self.portfolio.keys()):
                     print(self.portfolio[code].__dict__)
                     logger.info(self.portfolio[code].__dict__)
+
 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
