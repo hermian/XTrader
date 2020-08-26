@@ -361,13 +361,14 @@ class CPortStock_ShortTerm(object):
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
+    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도구간=0, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
         self.매수가 = 매수가
         self.보유일 = 보유일
         self.매도전략 = 매도전략
+        self.매도구간 = 매도구간
         self.매도전략변경1 = 매도전략변경1
         self.매도전략변경2 = 매도전략변경2
         self.수량 = 수량
@@ -1818,14 +1819,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def manual_portfolio(self):
         self.portfolio = dict()
         self.Stocklist = {
-            '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [3219],
+            '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [3219],
                        '매수조건': 1, '수량': 310, '매도전략': '4', '매도가': [3700], '매수일': '2020/05/29 09:22:39'},
 
-            '297090': {'번호': '7.101', '종목명': '씨에스베어링', '종목코드': '297090', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [5000],
+            '297090': {'번호': '7.101', '종목명': '씨에스베어링', '종목코드': '297090', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [5000],
                        '매수조건': 3, '수량': 15, '매도전략': '2', '매도가': [], '매수일': '2020/06/03 09:12:15'},
 
-            '053610': {'번호': '6.154', '종목명': '프로텍', '종목코드': '053610', '시장': 'KOSDAQ', '매수전략': '10', '매수가': [9500],
-                       '매수조건': 2, '수량': 26, '매도전략': '4', '매도가': [9900], '매수일': '2020/06/03 09:12:15'}
         }
 
         self.strategy = {'전략': {'단위투자금': 200000, '모니터링종료시간': '10:30:00', '보유일': 20,
@@ -2547,6 +2546,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print(self.portfolio[code].__dict__)
             logger.info(self.portfolio[code].__dict__)
 
+
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             try:
@@ -2598,6 +2598,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 print('CTradeShortTerm_Run Error :', e)
                 Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e, send='mc')
                 logger.error('CTradeShortTerm_Run Error : %s' % e)
+
 
         else:
             Telegram("[XTrader]%s ROBOT 실행 중지" % (self.sName))
@@ -3383,6 +3384,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.손절 = -2.7 # percent
         self.투자금비중 = 70 # 예수금 대비 percent
 
+        self.매도구간별조건 = [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]
         self.매수모니터링 = False
 
         # 매수할 종목은 해당 조건에서 검색된 종목
@@ -3495,13 +3497,60 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         return result
 
+    # 매도 구간 확인
+    def profit_band_check(self, 현재가, 매수가):
+        band_list = [0, 3, 5, 10, 15, 25]
+        # print('현재가, 매수가', 현재가, 매수가)
+
+        ratio = round((현재가 - 매수가) / 매수가 * 100, 2)
+        # print('ratio', ratio)
+
+        if ratio < 3:
+            return 1
+        elif ratio in band_list:
+            return band_list.index(ratio) + 1
+        else:
+            band_list.append(ratio)
+            band_list.sort()
+            band = band_list.index(ratio)
+            band_list.remove(ratio)
+            return band
+
     # 매도 전략
     def sell_strategy(self, code, price):
         result = False
-        sell_price = 0
+        band = self.portfolio[code].매도구간  # 이전 매도 구간 받음
+
+        sell_price = 현재가
 
         현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
         매수가 = self.portfolio[code].매수가
+
+        # 매도를 위한 수익률 구간 체크(매수가 대비 현재가의 수익률 조건에 다른 구간 설정)
+        new_band = self.profit_band_check(현재가, 매수가)
+        if (hogacal(시가, 0, self.portfolio[code].시장, '상한가')) <= 현재가:
+            band = 7
+
+        if band < new_band:  # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
+            band = new_band  # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
+
+        if band == 1 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[0] / 100)):
+            result = True
+        elif band == 2 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[1] / 100)):
+            result = True
+        elif band == 3 and 현재가 <= 고가 * (1 + (self.매도구간별조건[2] / 100)):
+            result = True
+        elif band == 4 and 현재가 <= 고가 * (1 + (self.매도구간별조건[3] / 100)):
+            result = True
+        elif band == 5 and 현재가 <= 고가 * (1 + (self.매도구간별조건[4] / 100)):
+            result = True
+        elif band == 6 and 현재가 <= 고가 * (1 + (self.매도구간별조건[5] / 100)):
+            result = True
+        elif band == 7 and 현재가 >= (hogacal(시가, -3, self.Stocklist[code]['시장'], '상한가')):
+            result = True
+
+        self.portfolio[code].매도구간 = band  # 포트폴리오에 매도구간 업데이트
+
 
         if self.portfolio[code].매도전략변경1 == False and current_time >= '11:00:00' and current_time < '13:00:00':
             self.portfolio[code].매도전략변경1 = True
