@@ -3377,6 +3377,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.손절 = -2.7  # percent
         self.투자금비중 = 70  # 예수금 대비 percent
 
+        self.sell_band = [0, 3, 5, 10, 15, 25]
         self.매도구간별조건 = [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]
 
         print("조검검색 로봇 셋팅 완료")
@@ -3501,7 +3502,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
     # 매도 구간 확인
     def profit_band_check(self, 현재가, 매수가):
-        band_list = [0, 3, 5, 10, 15, 25]
         # print('현재가, 매수가', 현재가, 매수가)
 
         ratio = round((현재가 - 매수가) / 매수가 * 100, 2)
@@ -3509,13 +3509,13 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         if ratio < 3:
             return 1
-        elif ratio in band_list:
-            return band_list.index(ratio) + 1
+        elif ratio in self.sell_band:
+            return self.sell_band.index(ratio) + 1
         else:
-            band_list.append(ratio)
-            band_list.sort()
-            band = band_list.index(ratio)
-            band_list.remove(ratio)
+            self.sell_band.append(ratio)
+            self.sell_band.sort()
+            band = self.sell_band.index(ratio)
+            self.sell_band.remove(ratio)
             return band
 
     # 매도 전략
@@ -3536,11 +3536,13 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         if band < new_band:  # 이전 구간보다 현재 구간이 높을 경우(시세가 올라간 경우)만
             band = new_band  # 구간을 현재 구간으로 변경(반대의 경우는 구간 유지)
 
+        # self.sell_band = [0, 3, 5, 10, 15, 25]
+        # self.매도구간별조건 = [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]
         if band == 1 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[0] / 100)):
             result = True
-        elif band == 2 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[1] / 100)):
+        elif band == 2 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[1] / 100)): # 3% 이하일 경우 0.3%까지 떨어지면 매도
             result = True
-        elif band == 3 and 현재가 <= 고가 * (1 + (self.매도구간별조건[2] / 100)):
+        elif band == 3 and 현재가 <= 고가 * (1 + (self.매도구간별조건[2] / 100)): # 5% 이상일 경우 고가대비 -3%까지 떨어지면 매도
             result = True
         elif band == 4 and 현재가 <= 고가 * (1 + (self.매도구간별조건[3] / 100)):
             result = True
@@ -3548,12 +3550,15 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             result = True
         elif band == 6 and 현재가 <= 고가 * (1 + (self.매도구간별조건[5] / 100)):
             result = True
-        elif band == 7 and 현재가 >= (hogacal(시가, -3, self.Stocklist[code]['시장'], '상한가')):
+        elif band == 7 and 현재가 >= (hogacal(시가, -3, self.portfolio[code].시장, '상한가')):
             result = True
 
         self.portfolio[code].매도구간 = band  # 포트폴리오에 매도구간 업데이트
 
+        if current_time >= '15:10:00': # 15시 10분에 매도 처리
+            result = True
 
+        """
         if self.portfolio[code].매도전략변경1 == False and current_time >= '11:00:00' and current_time < '13:00:00':
             self.portfolio[code].매도전략변경1 = True
             self.portfolio[code].매도전략 = self.portfolio[code].매도전략 * 0.6
@@ -3577,6 +3582,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         # elif 현재가 <= 매수가 * (1 + (self.손절 / 100)):
         #     result = True
         #     sell_price = 현재가
+        """
 
         return result, sell_price
 
@@ -3623,20 +3629,21 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             logger.info('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
 
             # 매수할 종목에 대해서 정액매수 주문하고 포트폴리오/매도할종목에 추가, 매수할종목에서 제외
-            if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
-                if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
-                    buy_check = self.buy_strategy(종목코드, 시세)
-                    if buy_check == True:
-                        (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
-                        if result == True:
-                            self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
-                                                              매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
-                            self.주문실행중_Lock['B_%s' % 종목코드] = True
-                            Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                            logger.info('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
-                        else:
-                            Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                            logger.info('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+            if current_time <= '14:30:00':
+                if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
+                    if len(self.portfolio) < self.최대포트수 and self.portfolio.get(종목코드) is None and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
+                        buy_check = self.buy_strategy(종목코드, 시세)
+                        if buy_check == True:
+                            (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
+                            if result == True:
+                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
+                                                                  매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+                                self.주문실행중_Lock['B_%s' % 종목코드] = True
+                                Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
+                                logger.info('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                            else:
+                                Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
+                                logger.info('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
 
     def 접수처리(self, param):
         pass
@@ -3726,8 +3733,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         # 메인 화면에 반영
         self.parent.RobotView()
 
+    # MainWindow의 ConditionTick에 의해서 3분마다 실행
     def ConditionCheck(self):
-        codes = self.GetCodes(self.조건식인덱스, self.조건식명)
+        codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
         print(current_time, codes)
         for code in codes:
             if code not in self.매수할종목 and self.portfolio.get(code) is None:
@@ -3742,7 +3750,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         ret = 0
         # self.manual_portfolio()
 
-
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             self.KiwoomConnect()
@@ -3752,7 +3759,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 self.sAccount = Account
 
-                self.실시간검색종목 = []
                 self.주문결과 = dict()
                 self.주문번호_주문_매핑 = dict()
                 self.주문실행중_Lock = dict()
@@ -3763,17 +3769,17 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 print('투자금 : ', self.투자총액)
                 print('단위투자금 : ', self.단위투자금)
 
-                self.최대포트수 = floor(self.투자총액 / self.단위투자금) + len(self.portfolio)
-                print('기존포트수 : ', len(self.portfolio))
+                self.최대포트수 = self.포트폴리오수 # floor(self.투자총액 / self.단위투자금) + len(self.portfolio)
+                # print('기존포트수 : ', len(self.portfolio))
                 print('최대포트수 : ', self.최대포트수)
 
                 print("조건식 인덱스 : ", self.조건식인덱스, type(self.조건식인덱스))
                 print("조건식명 : ", self.조건식명)
 
-                if self.조건검색타입 == 0:
+                if self.조건검색타입 == 0: # 3분봉 검색
                     self.parent.ConditionTick.start(1000)
                     codes = []
-                else:
+                else: # 실시간 검색
                     codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
 
                 self.초기조건(codes)
@@ -3794,10 +3800,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 logger.error('CTradeCondition_Run Error : %s' % e)
 
         else:
-            ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스)
-            ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
-
-            self.parent.ConditionTick.stop()
+            if self.조건검색타입 == 0:
+                self.parent.ConditionTick.stop()  # MainWindow 타이머 중지
+            else:
+                ret = self.sendConditionStop("0156", self.조건식명, self.조건식인덱스) # 실시간 조검 검색 중지
+                ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
 
             if self.portfolio is not None:
                 for code in list(self.portfolio.keys()):
@@ -4703,7 +4710,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # 8시 59분 30초 : 로봇 실행
-        if '09:03:00' <= current_time and current_time < '09:03:05':
+        if '09:00:00' <= current_time and current_time < '09:00:05':
             try:
                 if len(self.robots) > 0:
                     for r in self.robots:
