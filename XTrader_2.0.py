@@ -1769,7 +1769,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 row = []
                 row_buy = []
                 if status == '매수':
-                    print('%s 매수이력 row 내용 생성' % self.portfolio[code].종목명)
                     row.append(self.portfolio[code].번호)
                     row.append(self.portfolio[code].종목명)
                     row.append(self.portfolio[code].매수가)
@@ -1777,7 +1776,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     row.append(self.portfolio[code].매수일)
                     row.append(self.portfolio[code].매수조건)
 
-                print('%s 매수이력 row 내용 생성완료' % self.portfolio[code].종목명)
                 shortterm_history_sheet.append_row(row)
             except Exception as e:
                 print('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
