@@ -1741,7 +1741,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도구간)
 
-                계산수익률 = round((self.Stocklist[code]['매도체결가'] / self.Stocklist[code]['매수가'] - 1) * 100, 2)
+                계산수익률 = round((self.portfolio[code]['매도체결가'] / self.portfolio[code]['매수가'] - 1) * 100, 2)
                 cell = alpha_list[shortterm_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
                 shortterm_history_sheet.update_acell(cell, 계산수익률)
 
