@@ -399,7 +399,6 @@ class CTrade(object):
 
     # 조건 검색식 종목 읽기
     def GetCodes(self, Index, Name, Type):
-        print("CTrade : GetCodes")
         logger.info("조건 검색식 종목 읽기")
         # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
         # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
@@ -416,14 +415,12 @@ class CTrade(object):
 
     def getConditionLoad(self):
         self.kiwoom.dynamicCall("GetConditionLoad()")
-        print("CTrade : getConditionLoad")
 
         # receiveConditionVer() 이벤트 메서드에서 루프 종료
         self.ConditionLoop = QEventLoop()
         self.ConditionLoop.exec_()
 
     def getConditionNameList(self):
-        print("CTrade : getConditionNameList")
         data = self.kiwoom.dynamicCall("GetConditionNameList()")
 
         conditionList = data.split(';')
@@ -440,7 +437,7 @@ class CTrade(object):
 
     # 조건식 조회
     def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
-        print("CTrade : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
+        # print("CTrade : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
         isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int)",
                                      screenNo, conditionName, conditionIndex, isRealTime)
 
@@ -450,7 +447,7 @@ class CTrade(object):
 
     # 조건식 조회 중지
     def sendConditionStop(self, screenNo, conditionName, conditionIndex):
-        print("CTrade : sendConditionStop", screenNo, conditionName, conditionIndex)
+        # print("CTrade : sendConditionStop", screenNo, conditionName, conditionIndex)
         isRequest = self.kiwoom.dynamicCall("SendConditionStop(QString, QString, int)",
                                             screenNo, conditionName, conditionIndex)
 
@@ -1046,7 +1043,6 @@ class CTrade(object):
             logger.error('CTrade_OnReceiveRealData Error : %s' % e)
 
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
-        print("CTrade : OnReceiveTrCondition")
         try:
             if strCodeList == "":
                 return
@@ -1064,7 +1060,6 @@ class CTrade(object):
             print(e)
 
     def OnReceiveConditionVer(self, lRet, sMsg):
-        print("CTrade : OnReceiveConditionVer")
         try:
             self.condition = self.getConditionNameList()
 
@@ -2861,7 +2856,7 @@ class 화면_TradeCondition(QDialog, Ui_TradeCondition):
 
             self.data = DataFrame(data=self.result, columns=self.columns)
             self.data['종목코드'] = "'" + self.data['종목코드']
-            self.data.to_csv('조건식_'+ self.condition_name + '_종목.csv', encoding='euc-kr', index=False)
+            # self.data.to_csv('조건식_'+ self.condition_name + '_종목.csv', encoding='euc-kr', index=False)
             # print(self.temp)
             # 종목에 대한 주가 크롤링 후 최종 종목 선정
             # self.data = self.pick_stock(self.data)
@@ -4528,7 +4523,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
         self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
-        conditions = ['매물대거래량','외국인기관수급', '주도주', '당일주도주', '스토캐스틱&MACD&거래량회전율', '갭상승']
+        conditions = ['매물대거래량','외국인기관수급', '주도주', '당일주도주', '기본주도주','스토캐스틱&MACD&거래량회전율', '갭상승']
         try:
             self.getConditionLoad()
 
