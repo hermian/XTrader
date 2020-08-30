@@ -4710,7 +4710,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if len(self.robots) > 0:
                     for r in self.robots:
                         if r.running == False:  # 로봇이 실행중이 아니면
-                            # r.Run(flag=True, sAccount=로봇거래계좌번호)
+                            r.Run(flag=True, sAccount=로봇거래계좌번호)
                             self.RobotView()
             except Exception as e:
                 print('Robot Auto Run Error', e)
@@ -4718,13 +4718,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 logger.error('Robot Auto Run Error : %s' % e)
 
         # TradeShortTerm 보유일 만기 매도 전략 체크용
-        if current_time >= '15:29:00' and current_time < '15:29:30':
-            if len(self.robots) > 0:
-                for r in self.robots:
-                    if r.sName == 'TradeShortTerm':
-                        if r.holdcheck == False:
-                            r.holdcheck = True
-                            r.hold_strategy()
+        # if current_time >= '15:29:00' and current_time < '15:29:30':
+        #     if len(self.robots) > 0:
+        #         for r in self.robots:
+        #             if r.sName == 'TradeShortTerm':
+        #                 if r.holdcheck == False:
+        #                     r.holdcheck = True
+        #                     r.hold_strategy()
 
         # 16시 00분 : 로봇 정지
         if '16:00:00' <= current_time and current_time < '16:00:05':
@@ -4766,10 +4766,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #     self.close()
 
         # 지정 시간에 로봇을 중지한다던가 원하는 실행을 아래 pass에 작성
-        if current_time > '08:58:00' and current_time <= '15:30:00':
-            if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
-                self.ConditionCheck = True
-                self.GetCondition()
+        # if current_time > '08:58:00' and current_time <= '15:30:00':
+        #     if current.second == 0 and current.minute % 3 == 0 and self.ConditionCheck == False:
+        #         self.ConditionCheck = True
+        #         self.GetCondition()
 
             # if current.weekday() in workday_list: # 주중인지 확인
             #     if current_time in savetime_list: # 지정된 시간인지 확인
