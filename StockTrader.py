@@ -3373,7 +3373,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.투자금비중 = 70  # 예수금 대비 percent
 
         self.sell_band = [0, 3, 5, 10, 15, 25]
-        self.매도구간별조건 = [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]
+        self.매도구간별조건 = [-2.7, 0.3, -2.0, -2.0, -2.0, -2.0]
 
         print("조검검색 로봇 셋팅 완료")
 
