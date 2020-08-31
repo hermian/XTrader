@@ -361,10 +361,11 @@ class CPortStock_ShortTerm(object):
 
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
-    def __init__(self, 매수일, 종목코드, 종목명, 매수가, 보유일, 매도전략, 매도구간=0, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
+    def __init__(self, 매수일, 종목코드, 종목명, 시장, 매수가, 보유일, 매도전략, 매도구간=0, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
         self.매수일 = 매수일
         self.종목코드 = 종목코드
         self.종목명 = 종목명
+        self.시장 = 시장
         self.매수가 = 매수가
         self.보유일 = 보유일
         self.매도전략 = 매도전략
@@ -3602,6 +3603,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
             # MainWindow의 __init__에서 CODE_POOL 변수 선언(self.CODE_POOL = self.get_code_pool()), pool[종목코드] = [시장구분, 종목명, 주식수, 시가총액]
             종목명 = self.parent.CODE_POOL[종목코드][1]  # pool[종목코드] = [시장구분, 종목명, 주식수, 전일종가, 시가총액]
+            시장구분 = self.parent.CODE_POOL[종목코드][0]
             전일종가 = self.parent.CODE_POOL[종목코드][3]
             시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
@@ -3631,7 +3633,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         if buy_check == True:
                             (result, order) = self.정액매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 매수금액=self.단위투자금)
                             if result == True:
-                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
+                                self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 시장=시장구분, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
                                                                   매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
                                 self.주문실행중_Lock['B_%s' % 종목코드] = True
                                 Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
