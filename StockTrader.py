@@ -191,7 +191,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = False
+telegram_enable = True
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -433,7 +433,7 @@ class CTrade(object):
             key, value = condition.split('^')
             conditionDictionary[int(key)] = value
 
-        print(conditionDictionary)
+        # print(conditionDictionary)
         return conditionDictionary
 
     # 조건식 조회
@@ -1051,7 +1051,8 @@ class CTrade(object):
             self.codeList = strCodeList.split(';')
             del self.codeList[-1]
 
-            print(self.codeList)
+            # print(self.codeList)
+            logger.info("조건 검색 완료")
 
             self.ConditionLoop.exit()
             return self.codeList
@@ -3373,9 +3374,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.손절 = -2.7  # percent
         self.투자금비중 = 70  # 예수금 대비 percent
 
-        self.sell_band = [0, 3, 5, 10, 15, 25]
-        self.매도구간별조건 = [-2.7, 0.3, -2.0, -2.0, -2.0, -2.0]
-
         print("조검검색 로봇 셋팅 완료")
 
     # Robot_Run이 되면 실행됨 - 매도 종목을 리스트로 저장
@@ -3383,6 +3381,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         # print("CTradeCondition : 초기조건")
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
 
+        self.sell_band = [0, 3, 5, 10, 15, 25]
+        self.매도구간별조건 = [-2.7, 0.5, -2.0, -2.0, -2.0, -2.0]
 
         self.매수모니터링 = False
 
@@ -3641,6 +3641,10 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                             else:
                                 Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
                                 logger.info('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+            else:
+                if self.매수모니터링 == False:
+                    self.parent.ConditionTick.stop()
+                    self.매수모니터링 = True
 
     def 접수처리(self, param):
         pass
@@ -3736,11 +3740,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         print(current_time, codes)
         for code in codes:
             if code not in self.매수할종목 and self.portfolio.get(code) is None:
-                print('매수종목추가 : ', code)
+                print('매수종목추가 : ', code, self.parent.CODE_POOL[code][1])
                 self.매수할종목.append(code)
                 self.실시간종목리스트.append(code)
                 ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 종목 추가
-                logger.debug("실시간데이타요청 등록결과 %s" % ret)
+                logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
