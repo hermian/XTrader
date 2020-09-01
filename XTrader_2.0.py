@@ -1741,7 +1741,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도구간)
 
-                계산수익률 = round((self.portfolio[code]['매도체결가'] / self.portfolio[code]['매수가'] - 1) * 100, 2)
+                계산수익률 = round((self.portfolio[code].매도체결가 / self.portfolio[code].매수가 - 1) * 100, 2)
                 cell = alpha_list[shortterm_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
                 shortterm_history_sheet.update_acell(cell, 계산수익률)
 
@@ -1765,7 +1765,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             try:
-                logger.debug('CTradeShortTerm_save_history Error1 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                # logger.debug('CTradeShortTerm_save_history Error1 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
                 row = []
                 row_buy = []
                 if status == '매수':
@@ -1781,7 +1781,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 print('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
                 Telegram('[XTrade]CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e),
                          send='mc')
-                logger.debug('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                logger.error('CTradeShortTerm_save_history Error : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
