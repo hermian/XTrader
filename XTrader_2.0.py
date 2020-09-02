@@ -1628,6 +1628,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if data[0] == '단위투자금':
                     self.Stocklist['전략']['단위투자금'] = int(data[1])
                 elif data[0] == '매수모니터링 종료시간':
+                    if len(data[1][:-3]) == 1:
+                        data[1] = '0' + data[1]
                     self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
                 elif data[0] == '보유일':
                     self.Stocklist['전략']['보유일'] = int(data[1])
