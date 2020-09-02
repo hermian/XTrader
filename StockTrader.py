@@ -66,7 +66,7 @@ doc = gc.open_by_url(spreadsheet_url)
 doc_test = gc.open_by_url(testsheet_url)
 
 # stock_sheet = doc.worksheet('test') # Test Sheet
-stock_sheet = doc.worksheet('종목선정') # Sheet
+#stock_sheet = doc.worksheet('종목선정') # Sheet
 shortterm_history_sheet = doc.worksheet('매매이력')
 condition_history_sheet = doc_test.worksheet('조건식이력')
 shortterm_analysis_sheet = doc.worksheet('관심종목')
@@ -3619,8 +3619,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         if result == True:
                             self.주문실행중_Lock['S_%s' % 종목코드] = True
                             if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
-                            Telegram('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
-                            logger.info('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
+                            Telegram('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량), send='mc')
+                            logger.info('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량))
                         else:
                             Telegram('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
                             logger.info('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
@@ -3645,6 +3645,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 if self.매수모니터링 == False:
                     self.parent.ConditionTick.stop()
                     self.매수모니터링 = True
+                    logger.info("매수모니터링 시간 초과")
 
     def 접수처리(self, param):
         pass
