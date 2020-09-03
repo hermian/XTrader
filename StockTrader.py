@@ -3374,7 +3374,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.손절 = -2.7  # percent
         self.투자금비중 = 70  # 예수금 대비 percent
 
-        print("조검검색 로봇 셋팅 완료")
+        print("조검검색 로봇 셋팅 완료 - 조건인덱스 : %s, 조건식명 : %s, 검색타입 : %s"%(self.조건식인덱스, self.조건식명, self.조건검색타입))
+        logger.info("조검검색 로봇 셋팅 완료 - 조건인덱스 : %s, 조건식명 : %s, 검색타입 : %s" % (self.조건식인덱스, self.조건식명, self.조건검색타입))
 
     # Robot_Run이 되면 실행됨 - 매도 종목을 리스트로 저장
     def 초기조건(self, codes):
@@ -3385,6 +3386,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.매도구간별조건 = [-2.7, 0.5, -2.0, -2.0, -2.0, -2.0]
 
         self.매수모니터링 = False
+        self.clearcheck = False # 당일청산 체크변수
 
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
@@ -3582,6 +3584,28 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
         return result, sell_price
 
+    # 당일청산 전략
+    def clearning_strategy(self):
+        if self.clearcheck == True:
+            print('당일청산 매도')
+            try:
+                for code in list(self.portfolio.keys()):
+                    if self.주문실행중_Lock.get('S_%s' % code) is None and self.portfolio[code].수량 != 0:
+                        self.portfolio[code].매도구간 = 0
+                        self.매도방법 = '03' # 03:시장가
+                        (result, order) = self.정량매도(sRQName='S_%s' % code, 종목코드=code, 매도가=self.portfolio[code].매수가,
+                                                    수량=self.portfolio[code].수량)
+
+                        if result == True:
+                            self.주문실행중_Lock['S_%s' % code] = True
+                            Telegram('[StockTrader]정량매도(당일청산) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량), send='mc')
+                            logger.info('정량매도(당일청산) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
+                        else:
+                            Telegram('[StockTrader]정액매도실패(당일청산) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량), send='mc')
+                            logger.info('정량매도실패(당일청산) : 종목코드=%s, 종목명=%s, 수량=%s' % (code, self.portfolio[code].종목명, self.portfolio[code].수량))
+            except Exception as e:
+                print("clearning_strategy Error :", e)
+
     # 주문처리
     def 실시간데이터처리(self, param):
         if self.running == True:
@@ -3614,6 +3638,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 if self.portfolio.get(종목코드) is not None and self.주문실행중_Lock.get('S_%s' % 종목코드) is None:
                     # 매도 전략별 모니터링 체크
                     sell_check, 매도가 = self.sell_strategy(종목코드, 시세)
+
                     if sell_check == True:
                         (result, order) = self.정액매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=매도가, 수량=self.portfolio[종목코드].수량)
                         if result == True:
@@ -3746,6 +3771,15 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 self.실시간종목리스트.append(code)
                 ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 종목 추가
                 logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
+
+    # 실시간 조검 검색 편입 종목 처리
+    def 실시간조건처리(self, code):
+        if code not in self.매수할종목 and self.portfolio.get(code) is None:
+            print('매수종목추가 : ', code)
+            self.매수할종목.append(code)
+            self.실시간종목리스트.append(code)
+            ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')  # 실시간 시세조회 종목 추가
+            logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
@@ -4732,6 +4766,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         #                 if r.holdcheck == False:
         #                     r.holdcheck = True
         #                     r.hold_strategy()
+
+        # 15시 17분 :TradeCondition 당일청산 매도 실행
+        if current_time >= '15:17:00' and current_time < '15:17:30':
+            if len(self.robots) > 0:
+                for r in self.robots:
+                    if r.sName == 'TradeCondition' and '당일청산' in r.조건식명:
+                        if r.clearcheck == False:
+                            r.clearcheck = True
+                            r.clearning_strategy()
 
         # 16시 00분 : 로봇 정지
         if '16:00:00' <= current_time and current_time < '16:00:05':
