@@ -407,7 +407,11 @@ class CTrade(object):
 
         try:
             self.getConditionLoad()
+            print('getload 완료')
+            print('조건 검색 :', Name, int(Index), Type)
             codelist = self.sendCondition("0156", Name, int(Index), Type) # 선정된 검색조건식으로 바로 종목 검색
+
+            print('GetCodes :', self.codeList)
             return self.codeList
 
         except Exception as e:
@@ -415,6 +419,7 @@ class CTrade(object):
             print(e)
 
     def getConditionLoad(self):
+        print('getConditionLoad')
         self.kiwoom.dynamicCall("GetConditionLoad()")
 
         # receiveConditionVer() 이벤트 메서드에서 루프 종료
@@ -422,6 +427,7 @@ class CTrade(object):
         self.ConditionLoop.exec_()
 
     def getConditionNameList(self):
+        print('getConditionNameList')
         data = self.kiwoom.dynamicCall("GetConditionNameList()")
 
         conditionList = data.split(';')
@@ -438,11 +444,13 @@ class CTrade(object):
 
     # 조건식 조회
     def sendCondition(self, screenNo, conditionName, conditionIndex, isRealTime):
-        # print("CTrade : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
+        print("CTrade : sendCondition", screenNo, conditionName, conditionIndex, isRealTime)
         isRequest = self.kiwoom.dynamicCall("SendCondition(QString, QString, int, int)",
                                      screenNo, conditionName, conditionIndex, isRealTime)
 
         # receiveTrCondition() 이벤트 메서드에서 루프 종료
+        # 실시간 검색일 경우 Loop 미적용해서 바로 조회 등록이 되게 해야됨
+        # if self.조건검색타입 ==0:
         self.ConditionLoop = QEventLoop()
         self.ConditionLoop.exec_()
 
@@ -1044,9 +1052,11 @@ class CTrade(object):
             logger.error('CTrade_OnReceiveRealData Error : %s' % e)
 
     def OnReceiveTrCondition(self, sScrNo, strCodeList, strConditionName, nIndex, nNext):
+        print('OnReceiveTrCondition')
         try:
             if strCodeList == "":
-                return
+                self.ConditionLoop.exit()
+                return []
 
             self.codeList = strCodeList.split(';')
             del self.codeList[-1]
@@ -1055,6 +1065,7 @@ class CTrade(object):
             logger.info("조건 검색 완료")
 
             self.ConditionLoop.exit()
+            print('OnReceiveTrCondition :', self.codeList)
             return self.codeList
 
         except Exception as e:
@@ -1062,6 +1073,7 @@ class CTrade(object):
             print(e)
 
     def OnReceiveConditionVer(self, lRet, sMsg):
+        print('OnReceiveConditionVer')
         try:
             self.condition = self.getConditionNameList()
 
@@ -1080,13 +1092,13 @@ class CTrade(object):
         # :param strConditionIndex:
         # :return:
 
-        _now = datetime.datetime.now()
-        if _now.strftime('%H:%M:%S') < '09:03:00':  # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
+        _now = datetime.datetime.now().strftime('%H:%M:%S')
+        if (_now >= '10:00:00' and _now < '13:00:00') or _now >= '15:17:00':  # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
             return
 
         # logger.info('OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
 
-        print("실시간조검검색_종목코드: %s %s"%(sTrCode, "종목편입" if strType == "I" else "종목이탈"))
+        print("실시간조검검색_종목코드: %s %s / Time : %s"%(sTrCode, "종목편입" if strType == "I" else "종목이탈", _now))
 
         if strType == 'I':
             self.실시간조건처리(sTrCode)
@@ -3784,6 +3796,8 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
         ret = 0
+        codes = []
+        self.codeList = []
         # self.manual_portfolio()
 
         if flag == True:
@@ -3814,10 +3828,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                 if self.조건검색타입 == 0: # 3분봉 검색
                     self.parent.ConditionTick.start(1000)
-                    codes = []
-                else: # 실시간 검색
-                    codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
 
+                else: # 실시간 검색
+                    print('실시간 조건검색')
+                    codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
+                    codes = []
                 self.초기조건(codes)
 
                 print("매수 : ", self.매수할종목)
