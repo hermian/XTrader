@@ -65,12 +65,11 @@ testsheet_url = 'https://docs.google.com/spreadsheets/d/1pLi849EDnjZnaYhphkLButp
 doc = gc.open_by_url(spreadsheet_url)
 doc_test = gc.open_by_url(testsheet_url)
 
-# stock_sheet = doc.worksheet('test') # Test Sheet
-#stock_sheet = doc.worksheet('종목선정') # Sheet
+shortterm_buy_sheet = doc.worksheet('매수모니터링')
+shortterm_sell_sheet = doc.worksheet('매도모니터링')
+shortterm_strategy_sheet = doc.worksheet('ST bot')
 shortterm_history_sheet = doc.worksheet('매매이력')
 condition_history_sheet = doc_test.worksheet('조건식이력')
-shortterm_analysis_sheet = doc.worksheet('관심종목')
-# test_analysis_sheet = doc_test.worksheet('test')
 
 shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
                           '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
@@ -1780,6 +1779,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if data[0] == '단위투자금':
                     self.Stocklist['전략']['단위투자금'] = int(data[1])
                 elif data[0] == '매수모니터링 종료시간':
+                    if len(data[1][:-3]) == 1:
+                        data[1] = '0' + data[1]
                     self.Stocklist['전략']['모니터링종료시간'] = data[1] + ':00'
                 elif data[0] == '보유일':
                     self.Stocklist['전략']['보유일'] = int(data[1])
@@ -1821,13 +1822,16 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_Setting Error :', e)
-            Telegram('[StockTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
+            Telegram('[XTrader]CTradeShortTerm_Setting Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_Setting Error : %s' % e)
 
     # 수동 포트폴리오 생성
     def manual_portfolio(self):
         self.portfolio = dict()
         self.Stocklist = {
+            '024840': {'번호': '8.030', '종목명': 'KBI메탈', '종목코드': '024840', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [1468],
+                       '매수조건': 2, '수량': 310, '매도전략': '1', '매도가': [], '매수일': '2020/08/26 09:56:54'},
+
             '097800': {'번호': '7.099', '종목명': '윈팩', '종목코드': '097800', '시장': 'KOSDAQ', '매수전략': '1', '매수가': [3219],
                        '매수조건': 1, '수량': 310, '매도전략': '4', '매도가': [3700], '매수일': '2020/05/29 09:22:39'},
 
@@ -1890,7 +1894,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 cell = alpha_list[shortterm_history_cols.index('매도구간')] + str(code_row)
                 shortterm_history_sheet.update_acell(cell, self.portfolio[code].매도구간)
 
-                계산수익률 = round((self.Stocklist[code]['매도체결가'] / self.Stocklist[code]['매수가'] - 1) * 100, 2)
+                계산수익률 = round((self.portfolio[code].매도체결가 / self.portfolio[code].매수가 - 1) * 100, 2)
                 cell = alpha_list[shortterm_history_cols.index('수익률(계산)')] + str(code_row)  # 수익률 계산
                 shortterm_history_sheet.update_acell(cell, 계산수익률)
 
@@ -1914,11 +1918,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             try:
-                logger.debug('CTradeShortTerm_save_history Error1 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                # logger.debug('CTradeShortTerm_save_history Error1 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
                 row = []
                 row_buy = []
                 if status == '매수':
-                    print('%s 매수이력 row 내용 생성' % self.portfolio[code].종목명)
                     row.append(self.portfolio[code].번호)
                     row.append(self.portfolio[code].종목명)
                     row.append(self.portfolio[code].매수가)
@@ -1926,13 +1929,12 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     row.append(self.portfolio[code].매수일)
                     row.append(self.portfolio[code].매수조건)
 
-                print('%s 매수이력 row 내용 생성완료' % self.portfolio[code].종목명)
                 shortterm_history_sheet.append_row(row)
             except Exception as e:
                 print('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
                 Telegram('[XTrade]CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e),
                          send='mc')
-                logger.debug('CTradeShortTerm_save_history Error2 : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
+                logger.error('CTradeShortTerm_save_history Error : 종목명:%s, %s' % (self.portfolio[code].종목명, e))
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
@@ -2121,7 +2123,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 except Exception as e:
                     print('sell_strategy 매도전략 2 Error :', e)
                     logger.error('CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e))
-                    Telegram('[StockTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
+                    Telegram('[XTrader]CTradeShortTerm_sell_strategy 종목 : %s 매도전략 2 Error : %s' % (code, e), send='mc')
                     result = False
                     return 매도방법, result, qty_ratio
 
@@ -2190,7 +2192,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
         except Exception as e:
             print('CTradeShortTerm_sell_strategy Error ', e)
-            Telegram('[StockTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
+            Telegram('[XTrader]CTradeShortTerm_sell_strategy Error : %s' % e, send='mc')
             logger.error('CTradeShortTerm_sell_strategy Error : %s' % e)
             result = False
             qty_ratio = 1
@@ -2275,12 +2277,17 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     self.portfolio[code].매도가 = []  # 매도 전략 변경에 따라 매도가 초기화
 
                     # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
-                    self.portfolio[code].매도구간별조건[0] = float(row[idx_loss].replace('%', '')) # 손절가 업데이트
+                    self.portfolio[code].매도구간별조건 = []
+                    self.portfolio[code].매도구간별조건.append(float(row[idx_loss].replace('%', '')))  # 손절가 업데이트
+                    for idx in range(1, len(self.Stocklist['전략']['매도구간별조건'])): # Stocklist의 매도구간별조건 전체를 바로 append할 경우 모든 종목이 동일한 값으로 들어감
+                        self.portfolio[code].매도구간별조건.append(self.Stocklist['전략']['매도구간별조건'][idx])
 
                     if self.portfolio[code].매도전략 == '4':  # 매도가 = [목표가(원), [손절가(%), 본전가(%), 1차익절가(%), 2차익절가(%)]]
                         self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
-                        self.portfolio[code].매도가.append(self.Stocklist['전략']['전략매도가'])
-                        self.portfolio[code].매도가[1][0] = float(row[idx_loss].replace('%', ''))
+                        self.portfolio[code].매도가.append([])
+                        for idx in range(len(self.Stocklist['전략']['전략매도가'])): # Stocklist의 전략매도가 전체를 바로 append할 경우 모든 종목이 동일한 값으로 들어감
+                            self.portfolio[code].매도가[1].append(self.Stocklist['전략']['전략매도가'][idx])
+                        self.portfolio[code].매도가[1][0] = self.portfolio[code].매도구간별조건[0] # float(row[idx_loss].replace('%', ''))
 
                         self.portfolio[code].sellcount = 0
                         self.portfolio[code].매도단위수량 = 0  # 전략4의 기본 매도 단위는 보유수량의 1/3
@@ -2555,7 +2562,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             print(self.portfolio[code].__dict__)
             logger.info(self.portfolio[code].__dict__)
 
-
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             try:
@@ -2591,6 +2597,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     print(self.portfolio[code].__dict__)
                     logger.info(self.portfolio[code].__dict__)
 
+
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
 
                 logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
@@ -2607,7 +2614,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 print('CTradeShortTerm_Run Error :', e)
                 Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e, send='mc')
                 logger.error('CTradeShortTerm_Run Error : %s' % e)
-
 
         else:
             Telegram("[XTrader]%s ROBOT 실행 중지" % (self.sName))
