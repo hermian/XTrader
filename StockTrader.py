@@ -1092,7 +1092,7 @@ class CTrade(object):
         # :return:
 
         _now = datetime.datetime.now().strftime('%H:%M:%S')
-        if (_now >= '10:00:00' and _now < '13:00:00') or _now >= '15:17:00':  # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
+        if (_now >= '10:00:00' and _now < '13:00:00') or _now >= '15:17:00':  # 10시부터 13시 이전 데이터 버림, 15시 17분 당일 매도 처리 후 데이터 버림
             return
 
         # logger.info('OnReceiveRealCondition [%s] [%s] [%s] [%s]' % (sTrCode, strType, strConditionName, strConditionIndex))
@@ -3792,7 +3792,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
-        if code not in self.매수할종목 and self.portfolio.get(code) is None:
+        if (code not in self.매수할종목) and (self.portfolio.get(code) is None) and (code not in self.금일매도종목):
             print('매수종목추가 : ', code)
             self.매수할종목.append(code)
             self.실시간종목리스트.append(code)
