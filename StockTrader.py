@@ -3780,15 +3780,26 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
     # MainWindow의 ConditionTick에 의해서 3분마다 실행
     def ConditionCheck(self):
-        codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
-        print(current_time, codes)
-        for code in codes:
-            if code not in self.매수할종목 and self.portfolio.get(code) is None:
-                print('매수종목추가 : ', code, self.parent.CODE_POOL[code][1])
-                self.매수할종목.append(code)
-                self.실시간종목리스트.append(code)
-                ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 종목 추가
-                logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
+        if '3' in self.sName and current_time == "15:00:00":
+            codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
+            print(current_time, codes)
+            code_list=[]
+            for code in codes:
+                code_list.append(code + '_' + self.parent.CODE_POOL[code][1] + '\n')
+            code_list = "".join(code_list)
+            print(current_time, code_list)
+            Telegram(code_list, send='mc')
+
+        else:
+            codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
+            print(current_time, codes)
+            for code in codes:
+                if code not in self.매수할종목 and self.portfolio.get(code) is None:
+                    print('매수종목추가 : ', code, self.parent.CODE_POOL[code][1])
+                    self.매수할종목.append(code)
+                    self.실시간종목리스트.append(code)
+                    ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 종목 추가
+                    logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
