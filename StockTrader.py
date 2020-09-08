@@ -399,7 +399,7 @@ class CTrade(object):
 
     # 조건 검색식 종목 읽기
     def GetCodes(self, Index, Name, Type):
-        logger.info("조건 검색식 종목 읽기")
+        logger.info("[%s]조건 검색식 종목 읽기"%(self.sName))
         # self.kiwoom.OnReceiveTrCondition[str, str, str, int, int].connect(self.OnReceiveTrCondition)
         # self.kiwoom.OnReceiveConditionVer[int, str].connect(self.OnReceiveConditionVer)
         # self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
@@ -1061,7 +1061,7 @@ class CTrade(object):
             del self.codeList[-1]
 
             # print(self.codeList)
-            logger.info("조건 검색 완료")
+            logger.info("[%s]조건 검색 완료"%(self.sName))
 
             self.ConditionLoop.exit()
             print('OnReceiveTrCondition :', self.codeList)
@@ -1167,9 +1167,9 @@ class CTrade(object):
 
             return ret
         except Exception as e:
-            print('CTradeShortTerm_정량매도 Error ', e)
-            Telegram('[StockTrader]CTradeShortTerm_정량매도 Error : %s' % e, send='mc')
-            logger.error('CTradeShortTerm_정량매도 Error : %s' % e)
+            print('[%s]정량매도 Error '%(self.sName,e))
+            Telegram('[StockTrader][%s]정량매도 Error : %s' % (self.sName, e), send='mc')
+            logger.error('[%s]정량매도 Error : %s' % (self.sName, e))
 
     def 정액매도(self, sRQName, 종목코드, 매도가, 수량):
         # sRQName = '정액매도%s' % self.sScreenNo
@@ -3403,8 +3403,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         self.sell_band = [0, 3, 5, 10, 15, 25]
         self.매도구간별조건 = [-2.7, 0.5, -2.0, -2.0, -2.0, -2.0]
 
-        self.매수모니터링 = False
+        self.매수모니터링 = True
         self.clearcheck = False # 당일청산 체크변수
+        self.조건검색이벤트 = False
 
         # 매수할 종목은 해당 조건에서 검색된 종목
         # 매도할 종목은 이미 매수가 되어 포트폴리오에 저장되어 있는 종목
@@ -3502,9 +3503,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 condition_history_sheet.append_row(row)
 
             except Exception as e:
-                print('CTradeCondition_save_history Error :', e)
-                Telegram('[StockTrader]CTradeCondition_save_history Error : %s' % e, send='mc')
-                logger.error('CTradeCondition_save_history Error : %s' % e)
+                print('[%s]save_history Error :'%(self.sName,e))
+                Telegram('[StockTrader][%s]save_history Error :'%(self.sName,e), send='mc')
+                logger.error('[%s]save_history Error :'%(self.sName,e))
 
     # 매수 전략별 매수 조건 확인
     def buy_strategy(self, code, price):
@@ -3662,11 +3663,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                         if result == True:
                             self.주문실행중_Lock['S_%s' % 종목코드] = True
                             if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
-                            Telegram('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량), send='mc')
-                            logger.info('[StockTrader]CTradeCondition 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량))
+                            Telegram('[StockTrader]%s 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (self.sName, 종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량), send='mc')
+                            logger.info('[StockTrader]%s 매도주문 : 종목코드=%s, 종목명=%s, 매도구간=%s, 매도가=%s, 수량=%s' % (self.sName, 종목코드, 종목명, self.portfolio[종목코드].매도구간, 현재가, self.portfolio[종목코드].수량))
                         else:
-                            Telegram('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
-                            logger.info('[StockTrader]CTradeCondition 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
+                            Telegram('[StockTrader]%s 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (self.sName, 종목코드, 종목명, 현재가, self.portfolio[종목코드].수량), send='mc')
+                            logger.info('[StockTrader]%s 매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 수량=%s' % (self.sName, 종목코드, 종목명, 현재가, self.portfolio[종목코드].수량))
 
             # 매수할 종목에 대해서 정액매수 주문하고 포트폴리오/매도할종목에 추가, 매수할종목에서 제외
             if current_time <= '14:30:00':
@@ -3679,15 +3680,15 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                                 self.portfolio[종목코드] = CPortStock(종목코드=종목코드, 종목명=종목명, 시장=시장구분, 매수가=현재가, 보유일=self.보유일, 매도전략 = self.익절,
                                                                   매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
                                 self.주문실행중_Lock['B_%s' % 종목코드] = True
-                                Telegram('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                                logger.info('[StockTrader]CTradeCondition 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                                Telegram('[StockTrader]%s 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (self.sName, 종목코드, 종목명, 현재가), send='mc')
+                                logger.info('[StockTrader]%s 매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s' % (self.sName, 종목코드, 종목명, 현재가))
                             else:
-                                Telegram('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가), send='mc')
-                                logger.info('[StockTrader]CTradeCondition 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                                Telegram('[StockTrader]%s 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (self.sName, 종목코드, 종목명, 현재가), send='mc')
+                                logger.info('[StockTrader]%s 매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (self.sName, 종목코드, 종목명, 현재가))
             else:
-                if self.매수모니터링 == False:
+                if self.매수모니터링 == True:
                     self.parent.ConditionTick.stop()
-                    self.매수모니터링 = True
+                    self.매수모니터링 = False
                     logger.info("매수모니터링 시간 초과")
 
     def 접수처리(self, param):
@@ -3729,11 +3730,11 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                         self.save_history(종목코드, status='매수')
 
-                        Telegram('[StockTrader]CTradeCondition 매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량), send='mc')
-                        logger.info('[StockTrader]CTradeCondition %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (종목코드, 주문))
+                        Telegram('[StockTrader]%s 매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (self.sName, P.종목명, P.매수가, P.수량), send='mc')
+                        logger.info('[StockTrader]%s %s 매수 완료 : 매수/주문%s Pop, 매도 Append  ' % (self.sName, 종목코드, 주문))
                     except Exception as e:
-                        Telegram('[StockTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명, send='mc')
-                        logger.error('[StockTrader]CTradeCondition 체결처리_매수 POP에러 종목명:%s ' % P.종목명)
+                        Telegram('[StockTrader]%s 체결처리_매수 POP에러 종목명:%s ' % (self.sName, P.종목명), send='mc')
+                        logger.error('[StockTrader]%s 체결처리_매수 POP에러 종목명:%s ' % (self.sName, P.종목명))
 
         # 매도
         if param['매도수구분'] == '1':
@@ -3753,12 +3754,12 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
                         self.save_history(종목코드, status='매도')
 
-                        Telegram('[StockTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량), send='mc')
-                        logger.info('[StockTrader]CTradeCondition 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+                        Telegram('[StockTrader]%s 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (self.sName, param['종목명'], 체결가, 주문수량), send='mc')
+                        logger.info('[StockTrader]%s 매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (self.sName, param['종목명'], 체결가, 주문수량))
 
                 except Exception as e:
-                    Telegram('[StockTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e, send='mc')
-                    logger.error('[StockTrader]CTradeCondition 체결처리_매도 매매이력 Error : %s' % e)
+                    Telegram('[StockTrader]%s 체결처리_매도 매매이력 Error : %s' % (self.sName, e), send='mc')
+                    logger.error('[StockTrader]%s 체결처리_매도 매매이력 Error : %s' % (self.sName, e))
 
         # 메인 화면에 반영
         self.parent.RobotView()
@@ -3780,26 +3781,30 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
 
     # MainWindow의 ConditionTick에 의해서 3분마다 실행
     def ConditionCheck(self):
-        if '3' in self.sName and current_time == "15:00:00":
-            codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
-            print(current_time, codes)
-            code_list=[]
-            for code in codes:
-                code_list.append(code + '_' + self.parent.CODE_POOL[code][1] + '\n')
-            code_list = "".join(code_list)
-            print(current_time, code_list)
-            Telegram(code_list, send='mc')
+        if '3' in self.sName:
+            if current_time >= "15:00:00" and self.조건검색이벤트 == False:
+                self.조건검색이벤트 = True
+                codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
+                print(current_time, codes)
+                code_list=[]
+                for code in codes:
+                    code_list.append(code + '_' + self.parent.CODE_POOL[code][1] + '\n')
+                code_list = "".join(code_list)
+                print(current_time, code_list)
+                Telegram(code_list, send='mc')
+            else:
+                pass
 
         else:
             codes = self.GetCodes(self.조건식인덱스, self.조건식명, self.조건검색타입)
             print(current_time, codes)
             for code in codes:
-                if code not in self.매수할종목 and self.portfolio.get(code) is None:
+                if code not in self.매수할종목 and self.portfolio.get(code) is None and code not in self.금일매도종목:
                     print('매수종목추가 : ', code, self.parent.CODE_POOL[code][1])
                     self.매수할종목.append(code)
                     self.실시간종목리스트.append(code)
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 종목 추가
-                    logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
+                    logger.debug("[%s]실시간데이타요청 등록결과 %s %s" % (self.sName, self.실시간종목리스트, ret))
 
     # 실시간 조검 검색 편입 종목 처리
     def 실시간조건처리(self, code):
@@ -3808,7 +3813,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             self.매수할종목.append(code)
             self.실시간종목리스트.append(code)
             ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')  # 실시간 시세조회 종목 추가
-            logger.debug("실시간데이타요청 등록결과 %s %s" % (self.실시간종목리스트, ret))
+            logger.debug("[%s]실시간데이타요청 등록결과 %s %s" % (self.sName, self.실시간종목리스트, ret))
 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
@@ -3822,7 +3827,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             self.KiwoomConnect()
 
             try:
-                logger.info("조건식 거래 로봇 실행")
+                logger.info("[%s]조건식 거래 로봇 실행"%(self.sName))
 
                 self.sAccount = Account
 
@@ -3856,7 +3861,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                 print("매도 : ", self.매도할종목)
 
                 self.실시간종목리스트 = self.매도할종목 + self.매수할종목
-                logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
+                logger.info("[%s]오늘 거래 종목 : %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
 
                 if len(self.실시간종목리스트) > 0:
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';') # 실시간 시세조회 등록
@@ -3882,7 +3887,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             if len(self.금일매도종목) > 0:
                 try:
                     Telegram("[StockTrader]%s 금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목), send='mc')
-                    logger.info("%s 금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목))
+                    logger.info("[%s]금일 매도 종목 손익 Upload : %s" % (self.sName, self.금일매도종목))
                     self.parent.statusbar.showMessage("금일 매도 종목 손익 Upload")
                     self.DailyProfit(self.금일매도종목)
                 except Exception as e:
@@ -4882,8 +4887,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             current = datetime.datetime.now()
             if current.second == 0 and current.minute % 3 == 0:
                 for robot in self.robots:
-                    if robot.sName == 'TradeCondition':
-                        robot.ConditionCheck()
+                    if 'TradeCondition' in robot.sName:
+                        if robot.조건검색타입 == 0:
+                            robot.ConditionCheck()
         except Exception as e:
             print(e)
 
@@ -5982,7 +5988,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         for p, v in portfolio.items():
                             result.append((v.번호, v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수조건, v.매도전략,  v.보유일, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
-                    elif RobotName == 'TradeCondition':
+                    elif 'TradeCondition' in RobotName:
                         self.portfolio_columns = ['종목코드', '종목명', '매수가', '수량', '매수일']
                         for p, v in portfolio.items():
                             result.append((v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수일))
