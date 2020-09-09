@@ -358,6 +358,16 @@ class CPortStock_ShortTerm(object):
             self.익절가2도달 = False
             self.목표가도달 = False
 
+# TradeLongTerm용 포트폴리오
+class CPortStock_LongTerm(object):
+    def __init__(self, 매수일, 종목코드, 종목명, 시장, 매수가, 수량=0):
+        self.매수일 = 매수일
+        self.종목코드 = 종목코드
+        self.종목명 = 종목명
+        self.시장 = 시장
+        self.매수가 = 매수가
+        self.수량 = 수량
+
 # 기본 로봇용 포트폴리오
 class CPortStock(object):
     def __init__(self, 매수일, 종목코드, 종목명, 시장, 매수가, 보유일, 매도전략, 매도구간=0, 매도전략변경1=False, 매도전략변경2=False, 수량=0):
@@ -586,7 +596,7 @@ class CTrade(object):
             self.kiwoom.OnReceiveRealCondition[str, str, str, str].connect(self.OnReceiveRealCondition)
 
         except Exception as e:
-            print("CTrade : KiwoomConnect Error :", e)
+            print("CTrade : [%s]KiwoomConnect Error :"&(self.sName, e))
 
         # logger.info("%s : connected" % self.sName)
 
@@ -2655,6 +2665,259 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # 메인 화면에 반영
             self.parent.RobotView()
 
+class CTradeLongTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
+    def __init__(self, sName, UUID, kiwoom=None, parent=None):
+        self.sName = sName
+        self.UUID = UUID
+
+        self.sAccount = None
+        self.kiwoom = kiwoom
+        self.parent = parent
+
+        self.running = False
+
+        self.주문결과 = dict()
+        self.주문번호_주문_매핑 = dict()
+        self.주문실행중_Lock = dict()
+
+        self.portfolio = dict()
+
+        self.실시간종목리스트 = []
+
+        self.SmallScreenNumber = 9999
+
+        self.d = today
+
+    # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
+    def Setting(self, sScreenNo, 매수방법='03', 매도방법='03', 종목리스트=[]):
+        self.sScreenNo = sScreenNo
+        self.실시간종목리스트 = []
+        self.매수방법 = 매수방법
+        self.매도방법 = 매도방법
+
+    # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
+    def 초기조건(self):
+        # 매수총액 계산하기
+        # 금일매도종목 리스트 변수 초기화
+        # 매도할종목 : 포트폴리오에 있던 종목 추가
+        # 매수할종목 : 구글에서 받은 종목 추가
+        self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
+
+        self.금일매도종목 = []  # 장 마감 후 금일 매도한 종목에 대해서 매매이력 정리 업데이트(매도가, 손익률 등)
+        self.매도할종목 = []
+        self.매수할종목 = []
+
+        self.종목리스트 = ['305540']
+        self.수량 = [1]
+
+        for code in self.종목리스트:  # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
+            self.매수할종목.append(code)
+
+        # 포트폴리오에 있는 종목은 매도 관련 전략 재확인(구글시트) 및 '매도할종목'에 추가
+        if len(self.portfolio) > 0:
+            for port_code in list(self.portfolio.keys()):
+                self.매도할종목.append(port_code)
+
+    def 실시간데이터처리(self, param):
+        try:
+            if self.running == True:
+                체결시간 = '%s %s:%s:%s' % (str(self.d), param['체결시간'][0:2], param['체결시간'][2:4], param['체결시간'][4:])
+                종목코드 = param['종목코드']
+                현재가 = abs(int(float(param['현재가'])))
+                전일대비 = int(float(param['전일대비']))
+                등락률 = float(param['등락률'])
+                매도호가 = abs(int(float(param['매도호가'])))
+                매수호가 = abs(int(float(param['매수호가'])))
+                누적거래량 = abs(int(float(param['누적거래량'])))
+                시가 = abs(int(float(param['시가'])))
+                고가 = abs(int(float(param['고가'])))
+                저가 = abs(int(float(param['저가'])))
+                거래회전율 = abs(float(param['거래회전율']))
+                시가총액 = abs(int(float(param['시가총액'])))
+
+                종목명 = self.parent.CODE_POOL[종목코드][1]  # pool[종목코드] = [시장구분, 종목명, 주식수, 전일종가, 시가총액]
+                시장구분 = self.parent.CODE_POOL[종목코드][0]
+                전일종가 = self.parent.CODE_POOL[종목코드][3]
+                시세 = [현재가, 시가, 고가, 저가, 전일종가]
+
+                self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
+
+                # 매수 조건
+                # 매수모니터링 종료 시간 확인
+                if current_time >= "09:00:00":
+                    if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목 and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
+                        (result, order) = self.정량매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 수량=self.수량[0])
+                        if result == True:
+                            self.portfolio[종목코드] = CPortStock_LongTerm(종목코드=종목코드, 종목명=종목명, 시장=시장구분, 매수가=현재가, 매수일=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'))
+                            self.주문실행중_Lock['B_%s' % 종목코드] = True
+                            Telegram('[StockTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수수량=%s' % (종목코드, 종목명, 현재가, self.수량[0]))
+                            logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수수량=%s' % (종목코드, 종목명, 현재가, self.수량[0]))
+
+                        else:
+                            Telegram('[StockTrader]매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+                            logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s' % (종목코드, 종목명, 현재가))
+
+                # 매도 조건
+                if 종목코드 in self.매도할종목:
+                    pass
+
+
+        except Exception as e:
+            print('CTradeLongTerm_실시간데이터처리 Error : %s, %s' % (종목명, e))
+            Telegram('[StockTrader]CTradeLongTerm_실시간데이터처리 Error : %s, %s' % (종목명, e), send='mc')
+            logger.error('CTradeLongTerm_실시간데이터처리 Error :%s, %s' % (종목명, e))
+
+    def 접수처리(self, param):
+        pass
+
+    def 체결처리(self, param):
+        종목코드 = param['종목코드']
+        주문번호 = param['주문번호']
+        self.주문결과[주문번호] = param
+
+        주문수량 = int(param['주문수량'])
+        미체결수량 = int(param['미체결수량'])
+        체결가 = int(0 if (param['체결가'] is None or param['체결가'] == '') else param['체결가'])  # 매입가 동일
+        단위체결량 = int(0 if (param['단위체결량'] is None or param['단위체결량'] == '') else param['단위체결량'])
+        당일매매수수료 = int(0 if (param['당일매매수수료'] is None or param['당일매매수수료'] == '') else param['당일매매수수료'])
+        당일매매세금 = int(0 if (param['당일매매세금'] is None or param['당일매매세금'] == '') else param['당일매매세금'])
+
+        # 매수
+        if param['매도수구분'] == '2':
+            if self.주문번호_주문_매핑.get(주문번호) is not None:
+                주문 = self.주문번호_주문_매핑[주문번호]
+                매수가 = int(주문[2:])
+                # 단위체결가 = int(0 if (param['단위체결가'] is None or param['단위체결가'] == '') else param['단위체결가'])
+
+                # logger.debug('매수-------> %s %s %s %s %s' % (param['종목코드'], param['종목명'], 매수가, 주문수량 - 미체결수량, 미체결수량))
+
+                P = self.portfolio.get(종목코드)
+                if P is not None:
+                    P.종목명 = param['종목명']
+                    P.매수가 = 체결가  # 단위체결가
+                    P.수량 += 단위체결량  # 추가 매수 대비해서 기존 수량에 체결된 수량 계속 더함(주문수량 - 미체결수량)
+
+                    P.매수일 = datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+                else:
+                    logger.error('ERROR 포트에 종목이 없음 !!!!')
+
+                if 미체결수량 == 0:
+                    try:
+                        self.주문실행중_Lock.pop(주문)
+                        self.매수할종목.remove(종목코드)
+                        self.매도할종목.append(종목코드)
+                        Telegram('[StockTrader]매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
+                        logger.info('매수체결완료_종목명:%s, 매수가:%s, 수량:%s' % (P.종목명, P.매수가, P.수량))
+                    except Exception as e:
+                        Telegram('[XTrader]체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e), send='mc')
+                        logger.error('체결처리_매수 에러 종목명:%s, %s ' % (P.종목명, e))
+
+        # 매도
+        if param['매도수구분'] == '1':
+            if self.주문번호_주문_매핑.get(주문번호) is not None:
+                주문 = self.주문번호_주문_매핑[주문번호]
+                매도가 = int(주문[2:])
+
+                try:
+                    if 미체결수량 == 0:
+                        self.주문실행중_Lock.pop(주문)
+
+                        P = self.portfolio.get(종목코드)
+                        if P is not None:
+                            P.종목명 = param['종목명']
+
+                        self.portfolio[종목코드].매도체결가 = 체결가
+                        self.portfolio[종목코드].매도수량 = 주문수량
+
+                        Telegram('[StockTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+                        logger.info('매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
+
+                except Exception as e:
+                    Telegram('[StockTrader]체결처리_매도 Error : %s' % e, send='mc')
+                    logger.error('체결처리_매도 Error : %s' % e)
+
+        # 메인 화면에 반영
+        self.parent.RobotView()
+
+    def 잔고처리(self, param):
+        # print('CTradeShortTerm : 잔고처리')
+
+        종목코드 = param['종목코드']
+        P = self.portfolio.get(종목코드)
+        if P is not None:
+            P.매수가 = int(0 if (param['매입단가'] is None or param['매입단가'] == '') else param['매입단가'])
+            P.수량 = int(0 if (param['보유수량'] is None or param['보유수량'] == '') else param['보유수량'])
+            if P.수량 == 0:
+                self.portfolio.pop(종목코드)
+                self.매도할종목.remove(종목코드)
+                if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
+                logger.info('잔고처리_포트폴리오POP %s ' % 종목코드)
+
+        # 메인 화면에 반영
+        self.parent.RobotView()
+
+    def Run(self, flag=True, sAccount=None):
+        self.running = flag
+        ret = 0
+        # self.manual_portfolio()
+
+        for code in list(self.portfolio.keys()):
+            print(self.portfolio[code].__dict__)
+            logger.info(self.portfolio[code].__dict__)
+
+        if flag == True:
+            print("%s ROBOT 실행" % (self.sName))
+            try:
+                Telegram("[StockTrader]%s ROBOT 실행" % (self.sName))
+
+                self.sAccount = sAccount
+
+                self.투자총액 = floor(int(d2deposit.replace(",", "")) / len(self.parent.robots))
+
+                print('로봇거래계좌 : ', 로봇거래계좌번호)
+                print('D+2 예수금 : ', int(d2deposit.replace(",", "")))
+                print('투자 총액 : ', self.투자총액)
+
+                # self.최대포트수 = floor(int(d2deposit.replace(",", "")) / self.단위투자금 / len(self.parent.robots))
+                # print(self.최대포트수)
+
+                self.주문결과 = dict()
+                self.주문번호_주문_매핑 = dict()
+                self.주문실행중_Lock = dict()
+
+                self.초기조건()
+
+                print("매도 : ", self.매도할종목)
+                print("매수 : ", self.매수할종목)
+
+                self.실시간종목리스트 = self.매도할종목 + self.매수할종목
+
+                logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
+                self.KiwoomConnect()  # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
+                if len(self.실시간종목리스트) > 0:
+                    ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
+                    logger.debug("[%s]실시간데이타요청 등록결과 %s" % (self.sName, ret))
+
+            except Exception as e:
+                print('CTradeShortTerm_Run Error :', e)
+                Telegram('[XTrader]CTradeShortTerm_Run Error : %s' % e, send='mc')
+                logger.error('CTradeShortTerm_Run Error : %s' % e)
+
+        else:
+            Telegram("[StockTrader]%s ROBOT 실행 중지" % (self.sName))
+            ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
+
+            if self.portfolio is not None:
+                for code in list(self.portfolio.keys()):
+                    # 매수 미체결 종목 삭제
+                    if self.portfolio[code].수량 == 0:
+                        self.portfolio.pop(code)
+
+            self.KiwoomDisConnect()  # 로봇 클래스 내에서 일별종목별실현손익 데이터를 받고나서 연결 해제시킴
+
+            # 메인 화면에 반영
+            self.parent.RobotView()
+
 
 Ui_TradeCondition, QtBaseClass_TradeCondition = uic.loadUiType("./UI/TradeCondition.ui")
 class 화면_TradeCondition(QDialog, Ui_TradeCondition):
@@ -3868,9 +4131,9 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
                     logger.debug("실시간데이타요청 등록결과 %s" % ret)
 
             except Exception as e:
-                print('CTradeCondition_Run Error :', e)
-                Telegram('[StockTrader]CTradeCondition_Run Error : %s' % e, send='mc')
-                logger.error('CTradeCondition_Run Error : %s' % e)
+                print('[%s]_Run Error : %s' % (self.sName,e))
+                Telegram('[StockTrader][%s]_Run Error : %s' % (self.sName,e), send='mc')
+                logger.error('[StockTrader][%s]_Run Error : %s' % (self.sName,e))
 
         else:
             if self.조건검색타입 == 0:
@@ -4783,7 +5046,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # 8시 59분 30초 : 로봇 실행
-        if '09:00:00' <= current_time and current_time < '09:00:05':
+        if '08:59:30' <= current_time and current_time < '08:59:35':
             try:
                 if len(self.robots) > 0:
                     for r in self.robots:
@@ -5006,6 +5269,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             elif _action == "actionConditionMonitoring":
                 print("MainWindow : MENU_Action_actionConditionMonitoring")
                 self.ConditionMonitoring()
+            elif _action == "actionTradeLongTerm":
+                self.RobotAdd_TradeLongTerm()
+                self.RobotView()
             elif _action == "actionRobotLoad":
                 self.RobotLoad()
                 self.RobotView()
@@ -5988,7 +6254,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         for p, v in portfolio.items():
                             result.append((v.번호, v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수조건, v.매도전략,  v.보유일, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
-                    elif 'TradeCondition' in RobotName:
+                    elif 'TradeCondition' in RobotName or RobotName == 'TradeLongTerm':
                         self.portfolio_columns = ['종목코드', '종목명', '매수가', '수량', '매수일']
                         for p, v in portfolio.items():
                             result.append((v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수일))
@@ -6133,6 +6399,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         except Exception as e:
             print('RobotAutoAdd_TradeShortTerm', e)
             Telegram('[StockTrader]로봇 자동편집 실패 : %s' % e, send='mc')
+
+    # TradeLongTerm
+    def RobotAdd_TradeLongTerm(self):
+        # print("MainWindow : RobotAdd_TradeLongTerm")
+        try:
+            스크린번호 = self.GetUnAssignedScreenNumber()
+
+            매수방법 = '03'
+            매도방법 = '03'
+            스크린번호 = self.GetUnAssignedScreenNumber()
+            이름 = 'TradeLongTerm'
+            종목리스트 = []
+
+            r = CTradeLongTerm(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
+            r.Setting(sScreenNo=스크린번호, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
+            self.robots.append(r)
+
+        except Exception as e:
+            print('RobotAdd_TradeLongTerm', e)
 
     # TradeCondition
     def RobotAdd_TradeCondition(self):
