@@ -2127,7 +2127,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 
                     # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
                     self.portfolio[code].매도구간별조건 = []
-                    self.portfolio[code].매도구간별조건.append(float(row[idx_loss].replace('%', '')))  # 손절가 업데이트
+                    self.portfolio[code].매도구간별조건.append(round(((int(float(row[idx_loss].replace(',', ''))) / self.portfolio[code].매수가) - 1) * 100, 1))  # 손절가를 퍼센트로 변환하여 업데이트
                     for idx in range(1, len(self.Stocklist['전략']['매도구간별조건'])): # Stocklist의 매도구간별조건 전체를 바로 append할 경우 모든 종목이 동일한 값으로 들어감
                         self.portfolio[code].매도구간별조건.append(self.Stocklist['전략']['매도구간별조건'][idx])
 
@@ -2601,6 +2601,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionRobotSave.setIcon(QIcon('./PNG/Download.png'))
 
         self.actionTradeShortTerm.setIcon(QIcon('./PNG/Bullish.png'))
+
 
     # DB에 저장된 상장 종목 코드 읽음
     def get_code_pool(self):
