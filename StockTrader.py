@@ -114,56 +114,77 @@ def fix_stockcode(data):
 # 구글 스프레드 시트 Import후 DataFrame 반환
 def import_googlesheet():
     try:
-        row_data = stock_sheet.get_all_values() # 구글 스프레드시트 '종목선정' 시트 데이터 get
+        # 1. 매수 모니터링 시트 체크 및 매수 종목 선정
+        row_data = shortterm_buy_sheet.get_all_values() # 구글 스프레드시트 '매수모니터링' 시트 데이터 get
 
         # 작성 오류 체크를 위한 주요 항목의 위치(index)를 저장
-        idx_strategy = [row_data[0].index('매수전략'), row_data[0].index('매도전략')]
+        idx_strategy = row_data[0].index('기본매도전략')
         idx_buyprice = row_data[0].index('매수가1')
-        idx_sellprice = row_data[0].index('매도가')
+        idx_sellprice = row_data[0].index('목표가')
 
         # DB에서 받아올 종목코드와 시장 컬럼 추가
-        # 번호, 종목명, 매수모니터링, 비중, 매수전략, 시가위치, 매수가1, 매수가2, 매수가3, 매도전략, 매도가
+        # 번호, 종목명, 매수모니터링, 비중, 시가위치, 매수가1, 매수가2, 매수가3, 기존매도전략, 목표가
         row_data[0].insert(2, '종목코드')
         row_data[0].insert(3, '시장')
 
         for row in row_data[1:]:
             try:
                 code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
-                if row[idx_strategy[0]] == '' or row[idx_strategy[1]] == '': raise Exception('전략 설정 오류')  # 매수전략, 매도전략
-                if row[idx_buyprice] == '': raise Exception('매수가1 공란') # 매수가1
-                if row[idx_strategy[1]] == '5' and row[idx_sellprice] == '': raise Exception('매도전략5 매도가 공란') # 매도가
             except Exception as e:
                 name = ''
                 code = ''
                 market = ''
-                if str(e) != '매수가1 공란' and str(e) != '매도전략5 매도가 공란' and str(e) != '전략 설정 오류': e = '종목명 오류'
-                print('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
-                logger.error('구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
-                Telegram('[StockTrader]구글 스프레드 시트 오류 : %s, %s' % (row[1], e))
+                print('구글 매수모니터링 시트 종목명 오류 : %s' % (row[1]))
+                logger.error('구글 매수모니터링 시트 오류 : %s' % (row[1]))
+                Telegram('[XTrader]구글 매수모니터링 시트 오류 : %s' % (row[1]))
 
             row[1] = name # 정상 종목명으로 저장
             row.insert(2, code)
             row.insert(3, market)
 
-        print('[StockTrader]구글 시트 확인 완료')
-        # Telegram('[StockTrader]구글 시트 확인 완료')
-        # logger.info('[XTrader]구글 시트 확인 완료')
-
         data = pd.DataFrame(data=row_data[1:], columns=row_data[0])
 
         # 사전 데이터 정리
         data = data[(data['매수모니터링'] == '1') & (data['종목코드']!= '')]
-        data = data[row_data[0][:row_data[0].index('매도가')+1]]
+        data = data[row_data[0][:row_data[0].index('목표가')+1]]
         del data['매수모니터링']
 
         data.to_csv('%s_googlesheetdata.csv'%(datetime.date.today().strftime('%Y%m%d')), encoding='euc-kr', index=False)
+
+        # 2. 매도 모니터링 시트 체크(번호, 종목명, 보유일, 매도전략, 매도가)
+        row_data = shortterm_sell_sheet.get_all_values()  # 구글 스프레드시트 '매도모니터링' 시트 데이터 get
+
+        # 작성 오류 체크를 위한 주요 항목의 위치(index)를 저장
+        idx_holding = row_data[0].index('보유일')
+        idx_strategy = row_data[0].index('매도전략')
+        idx_loss = row_data[0].index('손절가')
+        idx_sellprice = row_data[0].index('목표가')
+
+        if len(row_data) > 1:
+            for row in row_data[1:]:
+                try:
+                    code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
+                    if row[idx_holding] == '' : raise Exception('보유일 오류')
+                    if row[idx_strategy] == '': raise Exception('매도전략 오류')
+                    if row[idx_loss] == '': raise Exception('손절가 오류')
+                    if row[idx_strategy] == '4' and row[idx_sellprice] == '': raise Exception('목표가 오류')
+                except Exception as e:
+                    if str(e) != '보유일 오류' and str(e) != '매도전략 오류' and str(e) != '손절가 오류'and str(e) != '목표가 오류': e = '종목명 오류'
+                    print('구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
+                    logger.error('구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
+                    Telegram('[XTrader]구글 매도모니터링 시트 오류 : %s, %s' % (row[1], e))
+
+        # print(data)
+        print('[XTrader]구글 시트 확인 완료')
+        # Telegram('[XTrader]구글 시트 확인 완료')
+        # logger.info('[XTrader]구글 시트 확인 완료')
 
         return data
 
     except Exception as e:
         # 구글 시트 import error시 에러 없어을 때 백업한 csv 읽어옴
-        print("import_googlesheet Error : %s", e)
-        logger.error("import_googlesheet Error : %s", e)
+        print("import_googlesheet Error : %s"%e)
+        logger.error("import_googlesheet Error : %s"%e)
         backup_file = datetime.date.today().strftime('%Y%m%d') + '_googlesheetdata.csv'
         if backup_file in os.listdir():
             data = pd.read_csv(backup_file, encoding='euc-kr')
@@ -175,7 +196,6 @@ def import_googlesheet():
             logger.info("import googlesheet backup_file")
 
             return data
-
 
 # Telegram Setting *****************************************
 with open('./secret/telegram_token.txt', mode='r') as tokenfile:
@@ -1710,7 +1730,7 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
             print(self.data)
 
             self.model.update(self.data)
-            for i in range(len(self.data)):
+            for i in range(len(self.data.columns)):
                 self.tableView.resizeColumnToContents(i)
 
         except Exception as e:
@@ -2566,7 +2586,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
     def Run(self, flag=True, sAccount=None):
         self.running = flag
         ret = 0
-        # self.manual_portfolio()
+        self.manual_portfolio()
 
         for code in list(self.portfolio.keys()):
             print(self.portfolio[code].__dict__)
@@ -2707,8 +2727,8 @@ class CTradeLongTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, �
         self.매도할종목 = []
         self.매수할종목 = []
 
-        self.종목리스트 = ['305540']
-        self.수량 = [1]
+        self.종목리스트 = ['293490']
+        self.수량 = [30]
 
         for code in self.종목리스트:  # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
             self.매수할종목.append(code)
@@ -2861,9 +2881,9 @@ class CTradeLongTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, �
         ret = 0
         # self.manual_portfolio()
 
-        for code in list(self.portfolio.keys()):
-            print(self.portfolio[code].__dict__)
-            logger.info(self.portfolio[code].__dict__)
+        # for code in list(self.portfolio.keys()):
+        #     print(self.portfolio[code].__dict__)
+        #     logger.info(self.portfolio[code].__dict__)
 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
@@ -5046,7 +5066,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # 8시 59분 30초 : 로봇 실행
-        if '08:59:30' <= current_time and current_time < '08:59:35':
+        if '09:00:00' <= current_time and current_time < '09:00:05':
             try:
                 if len(self.robots) > 0:
                     for r in self.robots:
@@ -6204,6 +6224,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # self.tableView_robot.horizontalHeader().setStretchLastSection(True)
 
+
     def RobotEdit(self, QModelIndex):
         try:
             # print(self.model._data[QModelIndex.row()])
@@ -6259,6 +6280,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         for p, v in portfolio.items():
                             result.append((v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
+
+                    for i in range(len(self.portfolio_columns)):
+                        self.tableView_portfolio.resizeColumnToContents(i)
                     break
 
         except Exception as e:
