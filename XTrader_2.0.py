@@ -1549,7 +1549,7 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
             print(self.data)
 
             self.model.update(self.data)
-            for i in range(len(self.data)):
+            for i in range(len(self.data.columns)):
                 self.tableView.resizeColumnToContents(i)
 
         except Exception as e:
@@ -3767,6 +3767,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         for p, v in portfolio.items():
                             result.append((v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
+
+                    for i in range(len(self.portfolio_columns)):
+                        self.tableView_portfolio.resizeColumnToContents(i)
                     break
 
         except Exception as e:
