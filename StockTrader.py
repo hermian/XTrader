@@ -2727,11 +2727,19 @@ class CTradeLongTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, �
         self.매도할종목 = []
         self.매수할종목 = []
 
-        self.종목리스트 = ['293490']
-        self.수량 = [30]
-
-        for code in self.종목리스트:  # 구글 시트에서 import된 매수 모니커링 종목은 '매수할종목'에 추가
-            self.매수할종목.append(code)
+        self.Stocklist = dict()
+        df = pd.read_csv('매수종목.csv', encoding='euc-kr')
+        codes= df['종목'].to_list()
+        qtys = df['수량'].to_list()
+        for 종목코드, 수량 in zip(codes, qtys):
+            code, name, market = get_code(종목코드)
+            self.Stocklist[code] = {
+                '종목명' : name,
+                '종목코드' : code,
+                '시장구분' : market,
+                '매수수량' : 수량
+            }
+        self.매수할종목 = list(self.Stocklist.keys())
 
         # 포트폴리오에 있는 종목은 매도 관련 전략 재확인(구글시트) 및 '매도할종목'에 추가
         if len(self.portfolio) > 0:
