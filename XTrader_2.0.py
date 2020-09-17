@@ -201,7 +201,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = False
+telegram_enable = True
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -2234,16 +2234,14 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                         종목코드, 종목명, 현재가, condition))
                                     logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                 else:
-                    if self.매수모니터링체크 == False:
-                        for code in self.매수할종목:
-                            if self.portfolio.get(code) is not None and code not in self.매도할종목:
-                                Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (종목코드, 종목명))
-                                logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (종목코드, 종목명))
-                                self.매수할종목.remove(code)
-                                self.매도할종목.append(code)
+                    for code in self.매수할종목:
+                        if self.portfolio.get(code) is not None and code not in self.매도할종목:
+                            Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                            logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                            self.매수할종목.remove(code)
+                            self.매도할종목.append(code)
 
-                        self.매수모니터링체크 = True
-                        logger.info('매도할 종목 :%s' % self.매도할종목)
+                            logger.info('매도할 종목 :%s' % self.매도할종목)
 
                 # 매도 조건
                 if 종목코드 in self.매도할종목:
