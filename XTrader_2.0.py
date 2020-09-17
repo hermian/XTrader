@@ -1574,7 +1574,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         self.portfolio = dict()
 
         self.실시간종목리스트 = []
-        self.매수모니터링체크 = False
+        self.매수모니터링완료 = False
 
         self.SmallScreenNumber = 9999
 
@@ -2234,14 +2234,15 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                                         종목코드, 종목명, 현재가, condition))
                                     logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
                 else:
-                    for code in self.매수할종목:
-                        if self.portfolio.get(code) is not None and code not in self.매도할종목:
-                            Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
-                            logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
-                            self.매수할종목.remove(code)
-                            self.매도할종목.append(code)
-
-                            logger.info('매도할 종목 :%s' % self.매도할종목)
+                    if self.매수모니터링완료 == False:
+                        for code in list(self.portfolio.keys()):
+                            if code not in self.매도할종목:
+                                Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                                logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                                self.매수할종목.remove(code)
+                                self.매도할종목.append(code)
+                            
+                        self.매수모니터링완료= True
 
                 # 매도 조건
                 if 종목코드 in self.매도할종목:
