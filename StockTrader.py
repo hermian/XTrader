@@ -3405,7 +3405,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         result = False
 
         현재가, 시가, 고가, 저가, 전일종가 = price  # 시세 = [현재가, 시가, 고가, 저가, 전일종가]
-        if self.단위투자금 // 현재가 > 0 and 현재가 >= 고가 * (0.99) and 저가 > 전일종가 and 현재가 < 시가 * 1.1 and 시가 <= 전일종가 * 1.5:
+        if self.단위투자금 // 현재가 > 0 and 현재가 >= 고가 * (0.99) and 저가 > 전일종가 and 현재가 < 시가 * 1.1 and 시가 <= 전일종가 * 1.05:
             result = True
 
         return result
