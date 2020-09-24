@@ -3449,7 +3449,7 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
         # self.sell_band = [0, 3, 5, 10, 15, 25]
         # self.매도구간별조건 = [-2.7, 0.3, -3.0, -4.0, -5.0, -7.0]
         if band == 1 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[0] / 100)):
-            result = True
+            result = False
         elif band == 2 and 현재가 <= 매수가 * (1 + (self.매도구간별조건[1] / 100)): # 3% 이하일 경우 0.3%까지 떨어지면 매도
             result = True
         elif band == 3 and 현재가 <= 고가 * (1 + (self.매도구간별조건[2] / 100)): # 5% 이상일 경우 고가대비 -3%까지 떨어지면 매도
