@@ -71,7 +71,6 @@ alpha_list = list(ascii_uppercase)
 # SQLITE DB Setting *****************************************
 DATABASE = 'stockdata.db'
 
-
 def sqliteconn():
     conn = sqlite3.connect(DATABASE)
     return conn
@@ -192,7 +191,6 @@ def import_googlesheet():
 
             return data
 
-
 # Telegram Setting *****************************************
 with open('./secret/telegram_token.txt', mode='r') as tokenfile:
     TELEGRAM_TOKEN = tokenfile.readline().strip()
@@ -207,8 +205,6 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
 telegram_enable = True
-
-
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -226,8 +222,7 @@ def Telegram(str, send='all'):
 # 매수 후 보유기간 계산 *****************************************
 today = datetime.date.today()
 
-
-def holdingcal(base_date, excluded=(6, 7)):  # 2018-06-23
+def holdingcal(base_date, excluded=(6, 7)):  # 주중 공휴일 처리 방안 검토
     yy = int(base_date[:4])  # 연도
     mm = int(base_date[5:7])  # 월
     dd = int(base_date[8:10])  # 일
@@ -1068,8 +1063,6 @@ class CTrade(object):
 
 
 Ui_계좌정보조회, QtBaseClass_계좌정보조회 = uic.loadUiType("./UI/계좌정보조회.ui")
-
-
 class 화면_계좌정보(QDialog, Ui_계좌정보조회):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):
         super(화면_계좌정보, self).__init__(parent)  # Initialize하는 형식
@@ -1182,8 +1175,6 @@ class 화면_계좌정보(QDialog, Ui_계좌정보조회):
 
 
 Ui_일자별주가조회, QtBaseClass_일자별주가조회 = uic.loadUiType("./UI/일자별주가조회.ui")
-
-
 class 화면_일별주가(QDialog, Ui_일자별주가조회):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):
         super(화면_일별주가, self).__init__(parent)
@@ -1260,8 +1251,6 @@ class 화면_일별주가(QDialog, Ui_일자별주가조회):
 
 
 Ui_분별주가조회, QtBaseClass_분별주가조회 = uic.loadUiType("./UI/분별주가조회.ui")
-
-
 class 화면_분별주가(QDialog, Ui_분별주가조회):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):
         super(화면_분별주가, self).__init__(parent)
@@ -1340,8 +1329,6 @@ class 화면_분별주가(QDialog, Ui_분별주가조회):
 
 
 Ui_업종정보, QtBaseClass_업종정보 = uic.loadUiType("./UI/업종정보조회.ui")
-
-
 class 화면_업종정보(QDialog, Ui_업종정보):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):
         super(화면_업종정보, self).__init__(parent)
@@ -1418,8 +1405,6 @@ class 화면_업종정보(QDialog, Ui_업종정보):
 
 
 Ui_업종별주가조회, QtBaseClass_업종별주가조회 = uic.loadUiType("./UI/업종별주가조회.ui")
-
-
 class 화면_업종별주가(QDialog, Ui_업종별주가조회):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):
         super(화면_업종별주가, self).__init__(parent)
@@ -1572,8 +1557,6 @@ class 화면_종목별투자자(QDialog, Ui_일자별주가조회):
 
 
 Ui_TradeShortTerm, QtBaseClass_TradeShortTerm = uic.loadUiType("./UI/TradeShortTerm.ui")
-
-
 class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
     def __init__(self, parent):
         super(화면_TradeShortTerm, self).__init__(parent)
@@ -1599,7 +1582,6 @@ class 화면_TradeShortTerm(QDialog, Ui_TradeShortTerm):
         except Exception as e:
             print('화면_TradeShortTerm : inquiry Error ', e)
             logger.error('화면_TradeShortTerm : inquiry Error : %s' % e)
-
 
 class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
     def __init__(self, sName, UUID, kiwoom=None, parent=None):
@@ -2565,8 +2547,6 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
 # 메인
 ##################################################################################
 Ui_MainWindow, QtBaseClass_MainWindow = uic.loadUiType("./UI/XTrader_MainWindow.ui")
-
-
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         # 화면을 보여주기 위한 코드
