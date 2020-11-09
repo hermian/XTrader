@@ -2128,7 +2128,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 if code in list(self.portfolio.keys()):
                     self.portfolio[code].보유일 = row[idx_holding]
                     self.portfolio[code].매도전략 = row[idx_strategy]
-                    self.portfolio[code].매도가 = []  # 매도 전략 변경에 따라 매도가 초기화
+                    self.portfolio[code].매도가 = []  # 매도가 초기화 후 매도 전략에 따라 재저장
 
                     # 매도구간별조건 = [손절가(%), 본전가(%), 구간3 고가대비(%), 구간4 고가대비(%), 구간5 고가대비(%), 구간6 고가대비(%)]
                     self.portfolio[code].매도구간별조건 = []
@@ -2149,6 +2149,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[code].익절가2도달 = False
                         self.portfolio[code].목표가도달 = False
                     else:
+                        if self.portfolio[code].매도전략 == '2': # 전략2의 매도가 저장
+                            self.portfolio[code].매도가.append(int(float(row[idx_sellprice].replace(',', ''))))
                         if self.portfolio[code].매도전략 == '2' or self.portfolio[code].매도전략 == '3':
                             self.portfolio[code].목표도달 = False  # 목표가(매도가) 도달 체크(False 상태로 구간 컷일경우 전량 매도)
                             self.portfolio[code].매도조건 = ''  # 구간매도 : B, 목표매도 : T
@@ -2165,8 +2167,8 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
             # 이 조건이 없을 경우 구글에서 받은 전략들이 아닌 과거 전략이 포트폴리오에서 넘어감
             # 근데 포트폴리오에 있는 종목을 왜 Stocklist에 넣어야되는지 모르겠음(내가 하고도...)
             if port_code not in list(self.Stocklist.keys()):
-                print(self.Stocklist)
                 print(port_code, ": Stocklist에 추가")
+                print(self.Stocklist)
                 self.Stocklist[port_code] = {
                     '번호': self.portfolio[port_code].번호,
                     '종목명': self.portfolio[port_code].종목명,
