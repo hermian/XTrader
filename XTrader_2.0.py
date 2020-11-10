@@ -2234,7 +2234,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                     # 매수 조건
                     # 매수모니터링 종료 시간 확인
                     if current_time < self.Stocklist['전략']['모니터링종료시간']:
-                        if 종목코드 in self.매수할종목 and 종목코드 not in self.금일매도종목:
+                        if 종목코드 in self.매수할종목: # and 종목코드 not in self.금일매도종목:
                             # 매수총액 + 종목단위투자금이 투자총액보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
                             if (self.매수총액 + self.Stocklist[종목코드]['단위투자금'] < self.투자총액) and self.주문실행중_Lock.get(
                                     'B_%s' % 종목코드) is None and len(
@@ -2391,6 +2391,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                         self.portfolio[종목코드].매도체결가 = 체결가
                         self.portfolio[종목코드].매도수량 = 주문수량
                         self.save_history(종목코드, status='매도')
+                        if 종목코드 not in self.금일매도종목: self.금일매도종목.append(종목코드)
 
                         Telegram('[XTrader]매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
                         logger.info('매도체결완료_종목명:%s, 체결가:%s, 수량:%s' % (param['종목명'], 체결가, 주문수량))
