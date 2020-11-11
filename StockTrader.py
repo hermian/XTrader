@@ -3840,6 +3840,7 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
             self.df_condition['Index'] = self.idx
             self.df_condition['Name'] = self.conName
             self.df_condition['Table'] = ">> 조건식 " + self.df_condition['Index'] + " : " + self.df_condition['Name']
+            self.df_condition['Index'] = self.df_condition['Index'].astype(int)
             self.df_condition = self.df_condition.sort_values(by='Index').reset_index(drop=True)  # 추가
 
             print(self.df_condition)  # 추가
