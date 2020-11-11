@@ -604,8 +604,7 @@ class CTrade(object):
         :return:
         """
         # print("CTrade : KiwoomSetRealReg")
-        ret = self.kiwoom.dynamicCall('SetRealReg(QString, QString, QString, QString)', sScreenNo, sCode, '9001;10',
-                                      sRealType)
+        ret = self.kiwoom.dynamicCall('SetRealReg(QString, QString, QString, QString)', sScreenNo, sCode, '9001;10;23', sRealType)
         return ret
 
     def KiwoomSetRealRemove(self, sScreenNo, sCode):
@@ -946,9 +945,11 @@ class CTrade(object):
                 param['시가총액'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 311).strip()
 
                 # 예상체결가(20.11.09)
-                if _now.strftime('%H:%M:%S') < '09:00:00':
-                    param['예상체결가1'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 23).strip()
-                    param['예상체결가2'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 291).strip()
+                if sRealType == "주식호가잔량" and _now.strftime('%H:%M:%S') < '09:00:00':
+                    param['예상체결가1'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 23).strip() # 예상시간이후에도 값유지
+                    param['예상체결가2'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 291).strip() # 예상시간에만 값, 이후는 0
+                elif _now.strftime('%H:%M:%S') < '09:10:00':
+                    print(param)
 
                 self.실시간데이터처리(param)
 
@@ -2432,7 +2433,7 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
             try:
-                # Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
+                Telegram("[XTrader]%s ROBOT 실행" % (self.sName))
 
                 self.sAccount = sAccount
 
