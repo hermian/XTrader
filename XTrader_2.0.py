@@ -2754,7 +2754,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.statusbar.showMessage("종목테이블 생성")
 
         # 8시 59분 : 구글 시트 종목 Import
-        if current_time == '08:39:00':
+        if current_time == '08:59:00':
             print('구글 시트 오류 체크 중지')
             # Telegram('[XTrader]구글 시트 오류 체크 중지')
             self.checkclock.stop()
@@ -2771,7 +2771,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.statusbar.showMessage('구글시트 Import')
 
         # 8시 59분 30초 : 로봇 실행
-        if '08:39:30' <= current_time and current_time < '08:39:40':
+        if '08:59:30' <= current_time and current_time < '08:59:40':
             try:
                 if len(self.robots) > 0:
                     for r in self.robots:
