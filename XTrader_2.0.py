@@ -113,20 +113,23 @@ def import_googlesheet():
         idx_sellprice = row_data[0].index('목표가')
 
         # DB에서 받아올 종목코드와 시장 컬럼 추가
-        # 번호, 종목명, 매수모니터링, 비중, 시가위치, 매수가1, 매수가2, 매수가3, 기존매도전략, 목표가
+        # 번호, 종목명, 매수모니터링, 비중, 시가위치, 매수가1, 매수가2, 매수가3, 기본매도전략, 목표가
         row_data[0].insert(2, '종목코드')
         row_data[0].insert(3, '시장')
 
         for row in row_data[1:]:
             try:
                 code, name, market = get_code(row[1])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
+                if row[idx_strategy] == '': raise Exception('매도전략 오류')
+                if row[idx_buyprice] == '': raise Exception('매수가1 오류')
             except Exception as e:
                 name = ''
                 code = ''
                 market = ''
-                print('구글 매수모니터링 시트 종목명 오류 : %s' % (row[1]))
-                logger.error('구글 매수모니터링 시트 오류 : %s' % (row[1]))
-                Telegram('[XTrader]구글 매수모니터링 시트 오류 : %s' % (row[1]))
+                if str(e) != '매도전략 오류' and str(e) != '매수가1 오류': e = '종목명 오류'
+                print('구글 매수모니터링 시트 종목명 오류 : %s, %s' % (row[1], e))
+                logger.error('구글 매수모니터링 시트 오류 : %s, %s' % (row[1], e))
+                Telegram('[XTrader]구글 매수모니터링 시트 오류 : %s, %s' % (row[1], e))
 
             row[1] = name # 정상 종목명으로 저장
             row.insert(2, code)
@@ -604,7 +607,7 @@ class CTrade(object):
         :return:
         """
         # print("CTrade : KiwoomSetRealReg")
-        ret = self.kiwoom.dynamicCall('SetRealReg(QString, QString, QString, QString)', sScreenNo, sCode, '9001;10;23', sRealType)
+        ret = self.kiwoom.dynamicCall('SetRealReg(QString, QString, QString, QString)', sScreenNo, sCode, '9001;10', sRealType)
         return ret
 
     def KiwoomSetRealRemove(self, sScreenNo, sCode):
@@ -920,9 +923,8 @@ class CTrade(object):
         # logger.debug('OnReceiveRealData [%s] [%s] [%s]' % (sRealKey, sRealType, sRealData))
         _now = datetime.datetime.now()
         try:
-            # 장전 예상체결가를 받기 위해서 임시로 주석처리함(20.11.09)
-            # if _now.strftime('%H:%M:%S') < '09:00:00': # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
-            #     return
+            if _now.strftime('%H:%M:%S') < '09:00:00': # 9시 이전 데이터 버림(장 시작 전에 테이터 들어오는 것도 많으므로 버리기 위함)
+                return
 
             if sRealKey not in self.실시간종목리스트: # 리스트에 없는 데이터 버림
                 return
@@ -943,13 +945,6 @@ class CTrade(object):
                 param['저가'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 18).strip()
                 param['거래회전율'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 31).strip()
                 param['시가총액'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 311).strip()
-
-                # 예상체결가(20.11.09)
-                if sRealType == "주식호가잔량" and _now.strftime('%H:%M:%S') < '09:00:00':
-                    param['예상체결가1'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 23).strip() # 예상시간이후에도 값유지
-                    param['예상체결가2'] = self.kiwoom.dynamicCall("GetCommRealData(QString, int)", sRealType, 291).strip() # 예상시간에만 값, 이후는 0
-                elif _now.strftime('%H:%M:%S') < '09:10:00':
-                    print(param)
 
                 self.실시간데이터처리(param)
 
@@ -1871,7 +1866,10 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 logger.debug("매수모니터링 만족_종목:%s, 시가:%s, 조건:%s, 현재가:%s, 체크결과:%s, 수량:%s" % (
                     self.Stocklist[code]['종목명'], 시가, condition, 현재가, result, qty))
 
-        return result, condition, qty
+        if condition <= 3: # 매수조건 4,5,6은 미사용(20.11.12)
+            return result, condition, qty
+        else:
+            return False, 0, 0
 
     # 매도 구간 확인
     def profit_band_check(self, 현재가, 매수가):
@@ -2219,93 +2217,83 @@ class CTradeShortTerm(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 
                 전일종가 = self.parent.CODE_POOL[종목코드][3]
                 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
-                # 예상체결가 임시 저장(20.11.09)
-                if current_time < '09:00:00':
-                    예상체결가1 = param['예상체결가1'] # int(float(param['예상체결가1']))
-                    예상체결가2 = param['예상체결가2'] # int(float(param['예상체결가2']))
-                    print('예상체결가 : ', 예상체결가1, 예상체결가2)
-                    print('예상체결가 Type : ', type(예상체결가1), type(예상체결가2))
-                    self.wr.writerow([체결시간, 종목코드, 종목명, 현재가, 전일대비, 예상체결가1, 예상체결가2])
-                else:
-                    self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
-                    예상체결가1 = 0
-                    예상체결가2 = 0
-                    self.wr.writerow([체결시간, 종목코드, 종목명, 현재가, 전일대비, 예상체결가1, 예상체결가2])
+                self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
+                self.wr.writerow([체결시간, 종목코드, 종목명, 현재가, 전일대비])
 
-                    # 매수 조건
-                    # 매수모니터링 종료 시간 확인
-                    if current_time < self.Stocklist['전략']['모니터링종료시간']:
-                        if 종목코드 in self.매수할종목: # and 종목코드 not in self.금일매도종목:
-                            # 매수총액 + 종목단위투자금이 투자총액보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
-                            if (self.매수총액 + self.Stocklist[종목코드]['단위투자금'] < self.투자총액) and self.주문실행중_Lock.get(
-                                    'B_%s' % 종목코드) is None and len(
-                                self.Stocklist[종목코드]['매수가']) > 0:  # and self.portfolio.get(종목코드) is None
-                                # 매수 전략별 모니터링 체크
-                                buy_check, condition, qty = self.buy_strategy(종목코드, 시세)
-                                if buy_check == True and (self.Stocklist[종목코드]['단위투자금'] // 현재가 > 0):
-                                    (result, order) = self.정량매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 수량=qty)
-
-                                    if result == True:
-                                        if self.portfolio.get(종목코드) is None:  # 포트폴리오에 없으면 신규 저장
-                                            self.set_portfolio(종목코드, 현재가, condition)
-
-                                        self.주문실행중_Lock['B_%s' % 종목코드] = True
-                                        Telegram('[XTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (
-                                            종목코드, 종목명, 현재가, condition, qty))
-                                        logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (
-                                            종목코드, 종목명, 현재가, condition, qty))
-
-                                    else:
-                                        Telegram('[XTrader]매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (
-                                            종목코드, 종목명, 현재가, condition))
-                                        logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
-                    else:
-                        if self.매수모니터링완료 == False:
-                            for code in list(self.portfolio.keys()):
-                                if code not in self.매도할종목:
-                                    Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
-                                    logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
-                                    self.매수할종목.remove(code)
-                                    self.매도할종목.append(code)
-
-                            self.매수모니터링완료= True
-
-                    # 매도 조건
-                    if 종목코드 in self.매도할종목:
-                        # 포트폴리오에 있음 and 매도주문실행중Lock에 없음 and 매수주문실행중Lock에 없음
-                        if self.portfolio.get(종목코드) is not None and self.주문실행중_Lock.get(
-                                'S_%s' % 종목코드) is None:  # and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
-                            # 매도 전략별 모니터링 체크
-                            매도방법, sell_check, ratio = self.sell_strategy(종목코드, 시세)
-                            if sell_check == True:
-                                # 종목 보유 수량이 1인데 절반매수가 될 경우 0.5로 주문 불가하여 이 경우는 전량 매도함
-                                if self.portfolio[종목코드].수량 == 1:
-                                    매도수량 = 1
-                                else:
-                                    매도수량 = round(self.portfolio[종목코드].수량 * ratio)
-
-                                if 매도방법 == '00':
-                                    (result, order) = self.정액매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가, 수량=매도수량)
-                                else:
-                                    (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가, 수량=매도수량)
+                # 매수 조건
+                # 매수모니터링 종료 시간 확인
+                if current_time < self.Stocklist['전략']['모니터링종료시간']:
+                    if 종목코드 in self.매수할종목: # and 종목코드 not in self.금일매도종목:
+                        # 매수총액 + 종목단위투자금이 투자총액보다 작음 and 매수주문실행중Lock에 없음 -> 추가매수를 위해서 and 포트폴리오에 없음 조건 삭제
+                        if (self.매수총액 + self.Stocklist[종목코드]['단위투자금'] < self.투자총액) and self.주문실행중_Lock.get(
+                                'B_%s' % 종목코드) is None and len(
+                            self.Stocklist[종목코드]['매수가']) > 0:  # and self.portfolio.get(종목코드) is None
+                            # 매수 전략별 모니터링 체크
+                            buy_check, condition, qty = self.buy_strategy(종목코드, 시세)
+                            if buy_check == True and (self.Stocklist[종목코드]['단위투자금'] // 현재가 > 0):
+                                (result, order) = self.정량매수(sRQName='B_%s' % 종목코드, 종목코드=종목코드, 매수가=현재가, 수량=qty)
 
                                 if result == True:
-                                    self.주문실행중_Lock['S_%s' % 종목코드] = True
-                                    Telegram('[XTrader]매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
-                                        종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간,매도수량))
-                                    if self.portfolio[종목코드].매도전략 == '2':
-                                        logger.info(
-                                            '매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (
-                                                종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간,
-                                                self.portfolio[종목코드].목표도달, self.portfolio[종목코드].매도조건,매도수량))
-                                    else:
-                                        logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
-                                            종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, 매도수량))
+                                    if self.portfolio.get(종목코드) is None:  # 포트폴리오에 없으면 신규 저장
+                                        self.set_portfolio(종목코드, 현재가, condition)
+
+                                    self.주문실행중_Lock['B_%s' % 종목코드] = True
+                                    Telegram('[XTrader]매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (
+                                        종목코드, 종목명, 현재가, condition, qty))
+                                    logger.info('매수주문 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s, 매수수량=%s' % (
+                                        종목코드, 종목명, 현재가, condition, qty))
+
                                 else:
-                                    Telegram('[XTrader]매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
+                                    Telegram('[XTrader]매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (
+                                        종목코드, 종목명, 현재가, condition))
+                                    logger.info('매수실패 : 종목코드=%s, 종목명=%s, 매수가=%s, 매수조건=%s' % (종목코드, 종목명, 현재가, condition))
+                else:
+                    if self.매수모니터링완료 == False:
+                        for code in list(self.portfolio.keys()):
+                            if code not in self.매도할종목:
+                                Telegram('[XTrader]매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                                logger.info('매수모니터링마감 : 종목코드=%s, 종목명=%s 매도모니터링 전환' % (code, self.parent.CODE_POOL[code][1]))
+                                self.매수할종목.remove(code)
+                                self.매도할종목.append(code)
+
+                        self.매수모니터링완료= True
+
+                # 매도 조건
+                if 종목코드 in self.매도할종목:
+                    # 포트폴리오에 있음 and 매도주문실행중Lock에 없음 and 매수주문실행중Lock에 없음
+                    if self.portfolio.get(종목코드) is not None and self.주문실행중_Lock.get(
+                            'S_%s' % 종목코드) is None:  # and self.주문실행중_Lock.get('B_%s' % 종목코드) is None:
+                        # 매도 전략별 모니터링 체크
+                        매도방법, sell_check, ratio = self.sell_strategy(종목코드, 시세)
+                        if sell_check == True:
+                            # 종목 보유 수량이 1인데 절반매수가 될 경우 0.5로 주문 불가하여 이 경우는 전량 매도함
+                            if self.portfolio[종목코드].수량 == 1:
+                                매도수량 = 1
+                            else:
+                                매도수량 = round(self.portfolio[종목코드].수량 * ratio)
+
+                            if 매도방법 == '00':
+                                (result, order) = self.정액매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가, 수량=매도수량)
+                            else:
+                                (result, order) = self.정량매도(sRQName='S_%s' % 종목코드, 종목코드=종목코드, 매도가=현재가, 수량=매도수량)
+
+                            if result == True:
+                                self.주문실행중_Lock['S_%s' % 종목코드] = True
+                                Telegram('[XTrader]매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
+                                    종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간,매도수량))
+                                if self.portfolio[종목코드].매도전략 == '2':
+                                    logger.info(
+                                        '매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 목표도달=%s, 매도조건=%s, 수량=%s' % (
+                                            종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간,
+                                            self.portfolio[종목코드].목표도달, self.portfolio[종목코드].매도조건,매도수량))
+                                else:
+                                    logger.info('매도주문 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
                                         종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, 매도수량))
-                                    logger.info('매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
-                                        종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, 매도수량))
+                            else:
+                                Telegram('[XTrader]매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
+                                    종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, 매도수량))
+                                logger.info('매도실패 : 종목코드=%s, 종목명=%s, 매도가=%s, 매도전략=%s, 매도구간=%s, 수량=%s' % (
+                                    종목코드, 종목명, 현재가, self.portfolio[종목코드].매도전략, self.portfolio[종목코드].매도구간, 매도수량))
 
 
         except Exception as e:
