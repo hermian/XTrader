@@ -70,6 +70,7 @@ shortterm_sell_sheet = doc.worksheet('매도모니터링')
 shortterm_strategy_sheet = doc.worksheet('ST bot')
 shortterm_history_sheet = doc.worksheet('매매이력')
 condition_history_sheet = doc_test.worksheet('조건식이력')
+price_monitoring_sheet = doc_test.worksheet('주가모니터링')
 
 shortterm_history_cols = ['번호', '종목명', '매수가', '매수수량', '매수일', '매수전략', '매수조건', '매도가', '매도수량',
                           '매도일', '매도전략', '매도구간', '수익률(계산)','수익률', '수익금', '세금+수수료', '확정 수익금']
@@ -210,7 +211,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = True
+telegram_enable = False
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -3794,7 +3795,6 @@ class CTradeCondition(CTrade): # 로봇 추가 시 __init__ : 복사, Setting / 
             # 메인 화면에 반영
             self.parent.RobotView()
 
-
 class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
     def __init__(self, sScreenNo, kiwoom=None, parent=None):  #
         super(화면_ConditionMonitoring, self).__init__(parent)
@@ -3984,6 +3984,141 @@ class 화면_ConditionMonitoring(QDialog, Ui_TradeCondition):
         print('조건식 종목 조회 완료')
         self.parent.statusbar.showMessage("조건식 종목 조회 완료")
 
+# 원하는 종목/주가 설정 후 알림
+class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting, 초기조건:전략에 맞게, 데이터처리~Run:복사
+    def __init__(self, sName, UUID, kiwoom=None, parent=None):
+        self.sName = sName
+        self.UUID = UUID
+
+        self.sAccount = None
+        self.kiwoom = kiwoom
+        self.parent = parent
+
+        self.running = False
+
+        self.주문결과 = dict()
+        self.주문번호_주문_매핑 = dict()
+        self.주문실행중_Lock = dict()
+
+        self.portfolio = dict()
+
+        self.실시간종목리스트 = []
+
+        self.SmallScreenNumber = 9999
+
+        self.d = today
+
+    # RobotAdd 함수에서 초기화 다음 셋팅 실행해서 설정값 넘김
+    def Setting(self, sScreenNo):
+        self.sScreenNo = sScreenNo
+
+    # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
+    def 초기조건(self):
+        self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
+
+        row_data = price_monitoring_sheet.get_all_values()
+
+        self.stocklist = {}
+        for row in row_data[1:]:
+            temp = []
+            try:
+                code, name, market = get_code(row[0])  # 종목명으로 종목코드, 종목명, 시장 받아서(get_code 함수) 추가
+            except Exception as e:
+                name = ''
+                code = ''
+                market = ''
+                print('구글 매수모니터링 시트 종목명 오류 : %s' % (row[1]))
+                logger.error('구글 매수모니터링 시트 오류 : %s' % (row[1]))
+                Telegram('[StockTrader]구글 매수모니터링 시트 오류 : %s' % (row[1]))
+
+            for idx in range(1, len(row)):
+                if row[idx] != '':
+                    temp.append(int(row[idx]))
+
+            self.stocklist[code] = {
+                '종목명': name,
+                '종목코드': code,
+                '모니터링주가': temp
+            }
+
+        print(self.stocklist)
+
+        self.모니터링종목 = list(self.Stocklist.keys())
+
+
+    def 실시간데이터처리(self, param):
+        try:
+            if self.running == True:
+                체결시간 = '%s %s:%s:%s' % (str(self.d), param['체결시간'][0:2], param['체결시간'][2:4], param['체결시간'][4:])
+                종목코드 = param['종목코드']
+                현재가 = abs(int(float(param['현재가'])))
+                전일대비 = int(float(param['전일대비']))
+                등락률 = float(param['등락률'])
+                매도호가 = abs(int(float(param['매도호가'])))
+                매수호가 = abs(int(float(param['매수호가'])))
+                누적거래량 = abs(int(float(param['누적거래량'])))
+                시가 = abs(int(float(param['시가'])))
+                고가 = abs(int(float(param['고가'])))
+                저가 = abs(int(float(param['저가'])))
+                거래회전율 = abs(float(param['거래회전율']))
+                시가총액 = abs(int(float(param['시가총액'])))
+
+                종목명 = self.parent.CODE_POOL[종목코드][1]  # pool[종목코드] = [시장구분, 종목명, 주식수, 전일종가, 시가총액]
+                시장구분 = self.parent.CODE_POOL[종목코드][0]
+                전일종가 = self.parent.CODE_POOL[종목코드][3]
+                시세 = [현재가, 시가, 고가, 저가, 전일종가]
+
+                self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
+
+                if len(self.stocklist[종목코드]['모니터링주가']) > 0:
+                    if 현재가 in self.stocklist[종목코드]['모니터링주가']:
+                        Telegram('[StockTrader]%s 주가도달 알림\n현재가 : %s, 시가 : %s, 고가 : %s, 저가 : %s' % (종목명, 현재가, 시가, 고가, 저가))
+                        self.stocklist[종목코드]['모니터링주가'].remove(현재가)
+
+        except Exception as e:
+            print('CTradeLongTerm_실시간데이터처리 Error : %s, %s' % (종목명, e))
+            Telegram('[StockTrader]CTradeLongTerm_실시간데이터처리 Error : %s, %s' % (종목명, e), send='mc')
+            logger.error('CTradeLongTerm_실시간데이터처리 Error :%s, %s' % (종목명, e))
+
+    def 접수처리(self, param):
+        pass
+
+    def 체결처리(self, param):
+        pass
+
+    def 잔고처리(self, param):
+        pass
+
+    def Run(self, flag=True, sAccount=None):
+        self.running = flag
+        ret = 0
+
+        if flag == True:
+            print("%s ROBOT 실행" % (self.sName))
+            try:
+                Telegram("[StockTrader]%s ROBOT 실행" % (self.sName))
+
+                self.초기조건()
+
+                logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.모니터링종목) + ';'))
+                self.KiwoomConnect()  # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
+                if len(self.모니터링종목) > 0:
+                    ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
+                    logger.debug("[%s]실시간데이타요청 등록결과 %s" % (self.sName, ret))
+
+            except Exception as e:
+                print('CPriceMonitoring_Run Error :', e)
+                Telegram('[StockTrader]CPriceMonitoring_Run Error : %s' % e, send='mc')
+                logger.error('CPriceMonitoring_Run Error : %s' % e)
+
+        else:
+            Telegram("[StockTrader]%s ROBOT 실행 중지" % (self.sName))
+            ret = self.KiwoomSetRealRemove(self.sScreenNo, 'ALL')
+
+            self.KiwoomDisConnect()  # 로봇 클래스 내에서 일별종목별실현손익 데이터를 받고나서 연결 해제시킴
+
+            # 메인 화면에 반영
+            self.parent.RobotView()
 
 ##################################################################################
 # 메인
@@ -4902,6 +5037,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.ConditionMonitoring()
             elif _action == "actionTradeLongTerm":
                 self.RobotAdd_TradeLongTerm()
+                self.RobotView()
+            elif _action == "actionPriceMonitoring":
+                self.RobotAdd_PriceMonitoring()
                 self.RobotView()
             elif _action == "actionRobotLoad":
                 self.RobotLoad()
@@ -5835,7 +5973,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
             # self.tableView_robot.horizontalHeader().setStretchLastSection(True)
 
-
     def RobotEdit(self, QModelIndex):
         try:
             # print(self.model._data[QModelIndex.row()])
@@ -5886,7 +6023,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         for p, v in portfolio.items():
                             result.append((v.번호, v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수조건, v.매도전략,  v.보유일, v.매수일))
                         self.portfolio_model.update((DataFrame(data=result, columns=self.portfolio_columns)))
-                    elif 'TradeCondition' in RobotName or RobotName == 'TradeLongTerm':
+                    elif 'TradeCondition' in RobotName or RobotName == 'TradeLongTerm' or RobotName == 'PriceMonitoring':
                         self.portfolio_columns = ['종목코드', '종목명', '매수가', '수량', '매수일']
                         for p, v in portfolio.items():
                             result.append((v.종목코드, v.종목명.strip(), v.매수가, v.수량, v.매수일))
@@ -6035,25 +6172,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             print('RobotAutoAdd_TradeShortTerm', e)
             Telegram('[StockTrader]로봇 자동편집 실패 : %s' % e, send='mc')
 
-    # TradeLongTerm
-    def RobotAdd_TradeLongTerm(self):
-        # print("MainWindow : RobotAdd_TradeLongTerm")
-        try:
-            스크린번호 = self.GetUnAssignedScreenNumber()
-
-            매수방법 = '03'
-            매도방법 = '03'
-            스크린번호 = self.GetUnAssignedScreenNumber()
-            이름 = 'TradeLongTerm'
-            종목리스트 = []
-
-            r = CTradeLongTerm(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
-            r.Setting(sScreenNo=스크린번호, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
-            self.robots.append(r)
-
-        except Exception as e:
-            print('RobotAdd_TradeLongTerm', e)
-
     # TradeCondition
     def RobotAdd_TradeCondition(self):
         # print("MainWindow : RobotAdd_TradeCondition")
@@ -6111,6 +6229,40 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             R.data.to_csv('1_키움조건식_종목리스트.csv', encoding='euc-kr', index=False)
             print('조건식 종목 저장 완료')
             self.statusbar.showMessage("조건식 종목 저장 완료")
+
+    # TradeLongTerm
+    def RobotAdd_TradeLongTerm(self):
+        # print("MainWindow : RobotAdd_TradeLongTerm")
+        try:
+            스크린번호 = self.GetUnAssignedScreenNumber()
+
+            매수방법 = '03'
+            매도방법 = '03'
+            스크린번호 = self.GetUnAssignedScreenNumber()
+            이름 = 'TradeLongTerm'
+            종목리스트 = []
+
+            r = CTradeLongTerm(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
+            r.Setting(sScreenNo=스크린번호, 매수방법=매수방법, 매도방법=매도방법, 종목리스트=종목리스트)
+            self.robots.append(r)
+
+        except Exception as e:
+            print('RobotAdd_TradeLongTerm', e)
+
+    # PriceMonitoring
+    def RobotAdd_PriceMonitoring(self):
+        # print("MainWindow : RobotAdd_PriceMonitoring")
+        try:
+            스크린번호 = self.GetUnAssignedScreenNumber()
+            이름 = 'PriceMonitoring'
+            종목리스트 = []
+
+            r = CPriceMonitoring(sName=이름, UUID=uuid.uuid4().hex, kiwoom=self.kiwoom, parent=self)
+            r.Setting(sScreenNo=스크린번호)
+            self.robots.append(r)
+
+        except Exception as e:
+            print('RobotAdd_PriceMonitoring', e)
 
     # 종목코드 생성
     def StockCodeBuild(self, to_db=False):
