@@ -47,6 +47,8 @@ from slacker import Slacker # 슬랙봇(추가 설치 모듈)
 
 import csv
 
+import FinanceDataReader as fdr
+
 # Google Spreadsheet Setting *******************************
 scope = ['https://spreadsheets.google.com/feeds',
          'https://www.googleapis.com/auth/drive']
@@ -4012,6 +4014,28 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
     def Setting(self, sScreenNo):
         self.sScreenNo = sScreenNo
 
+    # 수동 포트폴리오 생성
+    def manual_portfolio(self):
+        self.portfolio = dict()
+        self.Stocklist = {
+            '005935': {'종목명': '삼성전자우', '종목코드': '005935', '시장': 'KOSPI', '매수가': 50600,
+                       '수량': 10, '매수일': '2020/09/24 09:00:00'},
+
+            '092130': {'종목명': '이크레더블', '종목코드': '092130', '시장': 'KOSDAQ', '매수가': 24019,
+                       '수량': 21, '매수일': '2020/11/04 09:00:00'},
+
+            '271560': {'종목명': '오리온', '종목코드': '271560', '시장': 'KOSPI', '매수가': 132000,
+                       '수량': 10, '매수일': '2020/10/08 09:00:00'},
+        }
+
+        for code in list(self.Stocklist.keys()):
+            self.portfolio[code] = CPortStock_LongTerm(종목코드=code,
+                                                        종목명=self.Stocklist[code]['종목명'],
+                                                        시장=self.Stocklist[code]['시장'],
+                                                        매수가=self.Stocklist[code]['매수가'],
+                                                        수량=self.Stocklist[code]['수량'],
+                                                        매수일=self.Stocklist[code]['매수일'])
+
     # Robot_Run이 되면 실행됨 - 매수/매도 종목을 리스트로 저장
     def 초기조건(self):
         self.parent.statusbar.showMessage("[%s] 초기조건준비" % (self.sName))
@@ -4045,6 +4069,54 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
 
         self.모니터링종목 = list(self.stocklist.keys())
 
+        try:
+            self.df_codes = pd.DataFrame()
+            cnt = 0
+            for code in self.모니터링종목:
+                temp = fdr.DataReader(code)
+                temp = temp[-70:][['Open', 'High', 'Low', 'Close', 'Volume']]
+                temp.reset_index(inplace=True)
+                temp['Date'] = temp['Date'].astype(str)
+                temp['Code'] = code
+                if cnt == 0:
+                    self.df_codes = temp.copy()
+                else:
+                    self.df_codes = pd.concat([self.df_codes, temp])
+                    self.df_codes.reset_index(drop=True, inplace=True)
+                cnt += 1
+        except Exception as e:
+            print('CPriceMonitoring_초기조건 오류 : %s' % (e))
+            logger.error('CPriceMonitoring_초기조건 오류 : %s' % (e))
+            Telegram('[StockTrader]CPriceMonitoring_초기조건 오류 : %s' % (e))
+
+    # 이동평균가 위치 확인
+    def MA_Check(self, data):
+        if data['MA5'] < data['MA20']:
+            return True
+        else:
+            return False
+
+    # 이동평균을 이용한 매수 전략 신호 발생
+    def MA_Strategy(self, name, code, price):
+        today = datetime.today().strftime("%Y-%m-%d")
+        현재가, 시가, 고가, 저가, 거래량 = price
+
+        try:
+            df = self.df_codes.loc[self.df_codes['Code'] == code]
+            df.reset_index(drop=True, inplace=True)
+            df.loc[len(df)] = [today, 시가, 고가, 저가, 현재가, 거래량, code] #['Date', 'Open', 'High', 'Low', 'Close', 'Volume', 'Code]
+            df['MA5'] = df['Close'].rolling(window=5).mean()
+            df['MA20'] = df['Close'].rolling(window=20).mean()
+            df['MA_Check'] = df.apply(self.MA_Check, axis=1)
+
+            if df.iloc[-2]['MA_Check'] == True and df.iloc[-1]['MA_Check'] == False:
+                Telegram('[StockTrader]%s 매수 신호 발생\n현재가 : %s, 시가 : %s, 고가 : %s, 저가 : %s' % (name, 현재가, 시가, 고가, 저가))
+                logger.info('[StockTrader]%s 매수 신호 발생\n현재가 : %s, 시가 : %s, 고가 : %s, 저가 : %s' % (name, 현재가, 시가, 고가, 저가))
+        except Exception as e:
+            print('CPriceMonitoring_MA_Strategy 오류 : %s' % (e))
+            logger.error('CPriceMonitoring_MA_Strategy 오류 : %s' % (e))
+            Telegram('[StockTrader]CPriceMonitoring_MA_Strategy 오류 : %s' % (e))
+
     def 실시간데이터처리(self, param):
         try:
             if self.running == True:
@@ -4065,7 +4137,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
                 종목명 = self.parent.CODE_POOL[종목코드][1]  # pool[종목코드] = [시장구분, 종목명, 주식수, 전일종가, 시가총액]
                 시장구분 = self.parent.CODE_POOL[종목코드][0]
                 전일종가 = self.parent.CODE_POOL[종목코드][3]
-                시세 = [현재가, 시가, 고가, 저가, 전일종가]
+                시세 = [현재가, 시가, 고가, 저가, 누적거래량]
 
                 self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
                 # print("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
@@ -4074,6 +4146,9 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
                     if 현재가 in self.stocklist[종목코드]['모니터링주가']:
                         Telegram('[StockTrader]%s 주가도달 알림\n현재가 : %s, 시가 : %s, 고가 : %s, 저가 : %s' % (종목명, 현재가, 시가, 고가, 저가))
                         self.stocklist[종목코드]['모니터링주가'].remove(현재가)
+
+                self.MA_Strategy(종목명, 종목코드, 시세)
+
 
         except Exception as e:
             print('CTradeLongTerm_실시간데이터처리 Error : %s, %s' % (종목명, e))
@@ -4092,6 +4167,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
     def Run(self, flag=True, sAccount=None):
         self.running = flag
         ret = 0
+        # self.manual_portfolio()
 
         if flag == True:
             print("%s ROBOT 실행" % (self.sName))
@@ -4844,11 +4920,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                             r.clearning_strategy()
 
         # 16시 00분 : 로봇 정지
-        if '16:00:00' <= current_time and current_time < '16:00:05':
+        if '15:40:00' <= current_time and current_time < '15:40:05':
             self.RobotStop()
 
         # 16시 05분 : 프로그램 종료
-        if '16:05:00' <= current_time and current_time < '16:05:05':
+        if '15:45:00' <= current_time and current_time < '15:45:05':
             quit()
 
         # 18시 00분 : 종목 분석을 위한 일봉, 종목별투자자정보 업데이트
