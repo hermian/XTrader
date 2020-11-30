@@ -211,7 +211,7 @@ with open('./secret/Telegram.txt', mode='r') as tokenfile:
     CHAT_ID_yoo = r.split('\n')[1].split(', ')[1]
 bot_yoo = telepot.Bot(TELEGRAM_TOKEN_yoo)
 
-telegram_enable = False
+telegram_enable = True
 def Telegram(str, send='all'):
     try:
         if telegram_enable == True:
@@ -4043,8 +4043,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
 
         print(self.stocklist)
 
-        self.모니터링종목 = list(self.Stocklist.keys())
-
+        self.모니터링종목 = list(self.stocklist.keys())
 
     def 실시간데이터처리(self, param):
         try:
@@ -4069,6 +4068,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
                 시세 = [현재가, 시가, 고가, 저가, 전일종가]
 
                 self.parent.statusbar.showMessage("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
+                # print("[%s] %s %s %s %s" % (체결시간, 종목코드, 종목명, 현재가, 전일대비))
 
                 if len(self.stocklist[종목코드]['모니터링주가']) > 0:
                     if 현재가 in self.stocklist[종목코드]['모니터링주가']:
@@ -4099,10 +4099,11 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
                 Telegram("[StockTrader]%s ROBOT 실행" % (self.sName))
 
                 self.초기조건()
-
-                logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.모니터링종목) + ';'))
+                print('초기조건 설정 완료')
+                self.실시간종목리스트 = self.모니터링종목
+                logger.info("오늘 거래 종목 : %s %s" % (self.sName, ';'.join(self.실시간종목리스트) + ';'))
                 self.KiwoomConnect()  # MainWindow 외에서 키움 API구동시켜서 자체적으로 API데이터송수신가능하도록 함
-                if len(self.모니터링종목) > 0:
+                if len(self.실시간종목리스트) > 0:
                     ret = self.KiwoomSetRealReg(self.sScreenNo, ';'.join(self.실시간종목리스트) + ';')
                     logger.debug("[%s]실시간데이타요청 등록결과 %s" % (self.sName, ret))
 
