@@ -4043,6 +4043,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
         row_data = price_monitoring_sheet.get_all_values()
 
         self.stocklist = {}
+        self.Data_save = False
         for row in row_data[1:]:
             temp = []
             try:
@@ -4098,7 +4099,7 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
 
     # 이동평균을 이용한 매수 전략 신호 발생
     def MA_Strategy(self, name, code, price):
-        today = datetime.today().strftime("%Y-%m-%d")
+        today = datetime.datetime.today().strftime("%Y-%m-%d")
         현재가, 시가, 고가, 저가, 거래량 = price
 
         try:
@@ -4108,6 +4109,10 @@ class CPriceMonitoring(CTrade):  # 로봇 추가 시 __init__ : 복사, Setting,
             df['MA5'] = df['Close'].rolling(window=5).mean()
             df['MA20'] = df['Close'].rolling(window=20).mean()
             df['MA_Check'] = df.apply(self.MA_Check, axis=1)
+
+            if self.Data_save==False and current_time >= '15:19:00':
+                self.Data_save = True
+                self.df_codes.to_csv('PriceData.csv', encoding='euc-kr', index=False)
 
             if df.iloc[-2]['MA_Check'] == True and df.iloc[-1]['MA_Check'] == False:
                 Telegram('[StockTrader]%s 매수 신호 발생\n현재가 : %s, 시가 : %s, 고가 : %s, 저가 : %s' % (name, 현재가, 시가, 고가, 저가))
